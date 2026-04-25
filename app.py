@@ -462,7 +462,7 @@ with tab1:
             legend=dict(orientation="h", y=-0.22),
             height=370,
         )
-        st.plotly_chart(fig_cmp, use_container_width=True)
+        st.plotly_chart(fig_cmp, use_container_width=True, key="chart_fig_cmp_1")
 
     with c2:
         df_bar["ecart_pct"] = (df_bar["conso_relle_kwh"]-df_bar["conso_dpe_kwh"]) \
@@ -484,7 +484,7 @@ with tab1:
             height=370,
         )
         st.caption("Rouge = consommation reelle superieure au DPE | Vert = inferieure")
-        st.plotly_chart(fig_e, use_container_width=True)
+        st.plotly_chart(fig_e, use_container_width=True, key="chart_fig_e_2")
 
     st.markdown('<hr style="border-top:2px solid #eee;margin:16px 0">', unsafe_allow_html=True)
 
@@ -511,7 +511,7 @@ with tab1:
                 barmode="stack",
             )
             fig_st.update_layout(height=360, legend=dict(orientation="h",y=-0.3))
-            st.plotly_chart(fig_st, use_container_width=True)
+            st.plotly_chart(fig_st, use_container_width=True, key="chart_fig_st_3")
 
     with c4:
         avg_use = {
@@ -530,7 +530,7 @@ with tab1:
             )
             fig_pie.update_traces(texttemplate="%{label}<br>%{percent:.0%}")
             fig_pie.update_layout(height=360, showlegend=False)
-            st.plotly_chart(fig_pie, use_container_width=True)
+            st.plotly_chart(fig_pie, use_container_width=True, key="chart_fig_pie_4")
 
     st.markdown('<hr style="border-top:2px solid #eee;margin:16px 0">', unsafe_allow_html=True)
 
@@ -558,7 +558,7 @@ with tab1:
                 color_discrete_sequence=["#e15759","#f28e2b","#76b7b2"],
             )
             fig_dep.update_layout(height=340, legend=dict(orientation="h",y=-0.3))
-            st.plotly_chart(fig_dep, use_container_width=True)
+            st.plotly_chart(fig_dep, use_container_width=True, key="chart_fig_dep_5")
         else:
             st.info("Donnees de deperditions thermiques non disponibles pour ces logements.")
 
@@ -584,7 +584,7 @@ with tab1:
                 title="Radar deperditions moyennes (W/K)",
                 height=340,
             )
-            st.plotly_chart(fig_rad, use_container_width=True)
+            st.plotly_chart(fig_rad, use_container_width=True, key="chart_fig_rad_6")
 
     c7, c8 = st.columns(2)
 
@@ -609,7 +609,7 @@ with tab1:
             )
             fig_surf.update_traces(textposition="top center")
             fig_surf.update_layout(height=340)
-            st.plotly_chart(fig_surf, use_container_width=True)
+            st.plotly_chart(fig_surf, use_container_width=True, key="chart_fig_surf_7")
 
     with c8:
         # Qualite d'isolation
@@ -637,7 +637,7 @@ with tab1:
                 height=340,
                 legend=dict(orientation="h", y=-0.25),
             )
-            st.plotly_chart(fig_iso, use_container_width=True)
+            st.plotly_chart(fig_iso, use_container_width=True, key="chart_fig_iso_8")
 
     st.markdown('<hr style="border-top:2px solid #eee;margin:16px 0">', unsafe_allow_html=True)
 
@@ -771,7 +771,7 @@ with tab1:
                         showlegend=True,
                         legend=dict(font_size=10),
                     )
-                    st.plotly_chart(fig_mp, use_container_width=True)
+                    st.plotly_chart(fig_mp, use_container_width=True, key=f"chart_fig_mp_{rank}")
 
             with fc:
                 st.markdown("**Thermique & Isolation**")
@@ -807,7 +807,7 @@ with tab1:
                     },
                 ))
                 fig_g.update_layout(height=210, margin=dict(t=40,b=10,l=15,r=15))
-                st.plotly_chart(fig_g, use_container_width=True)
+                st.plotly_chart(fig_g, use_container_width=True, key=f"chart_fig_g_{rank}")
 
                 st.markdown(f"**Distance :** {dist:,} m de votre adresse")
 
@@ -841,7 +841,7 @@ with tab1:
         )
         fig_cmp3.update_traces(texttemplate="%{text:,.0f} kWh", textposition="outside")
         fig_cmp3.update_layout(showlegend=False, height=330)
-        st.plotly_chart(fig_cmp3, use_container_width=True)
+        st.plotly_chart(fig_cmp3, use_container_width=True, key="chart_fig_cmp3_11")
 
     with h2:
         # Distribution France avec position des 10 proches
@@ -864,7 +864,7 @@ with tab1:
             height=330,
             xaxis_range=[0, min(nat_s.quantile(0.97)*1.1, 14000)],
         )
-        st.plotly_chart(fig_h, use_container_width=True)
+        st.plotly_chart(fig_h, use_container_width=True, key="chart_fig_h_12")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -894,7 +894,7 @@ with tab2:
                            labels={"x":"Classe","y":"Nb logements"}, text=dpe_cnt.values)
             fig_b.update_traces(textposition="outside")
             fig_b.update_layout(showlegend=False, height=340)
-            st.plotly_chart(fig_b, use_container_width=True)
+            st.plotly_chart(fig_b, use_container_width=True, key="chart_fig_b_13")
 
         with c2:
             mc = median_conso_by_dpe(comm_df).reset_index()
@@ -904,7 +904,7 @@ with tab2:
             fig_g2.update_layout(barmode="group", title=f"Conso mediane par classe — {commune}",
                                   xaxis_title="DPE",yaxis_title="kWh/an",
                                   height=340,legend=dict(orientation="h",y=-0.22))
-            st.plotly_chart(fig_g2, use_container_width=True)
+            st.plotly_chart(fig_g2, use_container_width=True, key="chart_fig_g2_14")
 
         c3,c4 = st.columns(2)
         with c3:
@@ -919,7 +919,7 @@ with tab2:
                 mx = max(sc["conso_dpe_kwh"].max(),sc["conso_relle_kwh"].max())
                 fig_sc2.add_trace(go.Scatter(x=[0,mx],y=[0,mx],mode="lines",
                                              line=dict(dash="dash",color="grey"),name="Estimation parfaite"))
-                st.plotly_chart(fig_sc2, use_container_width=True)
+                st.plotly_chart(fig_sc2, use_container_width=True, key="chart_fig_sc2_15")
 
         with c4:
             mc2 = median_conso_by_dpe(comm_df)["conso_relle_kwh"]
@@ -938,7 +938,7 @@ with tab2:
                                  text="euros/an",height=340)
                 fig_gn2.update_traces(texttemplate="%{text} euros/an",textposition="outside")
                 fig_gn2.update_coloraxes(showscale=False)
-                st.plotly_chart(fig_gn2, use_container_width=True)
+                st.plotly_chart(fig_gn2, use_container_width=True, key="chart_fig_gn2_16")
 
         st.markdown("### Recapitulatif par classe DPE")
         tbl = median_conso_by_dpe(comm_df).reset_index()
@@ -971,7 +971,7 @@ with tab3:
                           color=dpe_nat.index,color_discrete_map=DPE_COLORS,
                           title="Repartition nationale des classes DPE",hole=0.35)
         fig_pie2.update_traces(texttemplate="%{label}<br>%{percent:.1%}",textposition="inside")
-        st.plotly_chart(fig_pie2, use_container_width=True)
+        st.plotly_chart(fig_pie2, use_container_width=True, key="chart_fig_pie2_17")
 
     with c2:
         box_df = nat.dropna(subset=["conso_relle_kwh","etiquette_dpe"])
@@ -983,7 +983,7 @@ with tab3:
                           labels={"etiquette_dpe":"Classe","conso_relle_kwh":"kWh/an"},
                           points="outliers")
         fig_box2.update_layout(showlegend=False)
-        st.plotly_chart(fig_box2, use_container_width=True)
+        st.plotly_chart(fig_box2, use_container_width=True, key="chart_fig_box2_18")
 
     c3,c4 = st.columns(2)
     with c3:
@@ -993,7 +993,7 @@ with tab3:
         fig_nc2.add_trace(go.Bar(name="Reel Enedis",x=nat_mc2["etiquette_dpe"].astype(str),y=nat_mc2["conso_relle_kwh"],marker_color="#F28E2B"))
         fig_nc2.update_layout(barmode="group",title="DPE estime vs Reel — mediane nationale",
                                xaxis_title="Classe DPE",yaxis_title="kWh/an",legend=dict(orientation="h",y=-0.25))
-        st.plotly_chart(fig_nc2, use_container_width=True)
+        st.plotly_chart(fig_nc2, use_container_width=True, key="chart_fig_nc2_19")
         st.caption("Effet precarite : les menages F/G se chauffent insuffisamment par contrainte budgetaire.")
 
     with c4:
@@ -1010,7 +1010,7 @@ with tab3:
                           title="Votre position relative",text="kWh/an")
         fig_pos2.update_traces(texttemplate="%{text:,.0f} kWh",textposition="outside")
         fig_pos2.update_layout(showlegend=False)
-        st.plotly_chart(fig_pos2, use_container_width=True)
+        st.plotly_chart(fig_pos2, use_container_width=True, key="chart_fig_pos2_20")
 
     st.markdown("### Gains nationaux par amelioration DPE")
     nat_mc_cls = median_conso_by_dpe(nat)["conso_relle_kwh"]
@@ -1042,7 +1042,7 @@ with tab3:
                       title="Conso reelle mediane par periode x classe DPE",
                       labels={"conso_relle_kwh":"kWh/an","periode_construction":"Periode"})
     fig_prd2.update_layout(height=370)
-    st.plotly_chart(fig_prd2, use_container_width=True)
+    st.plotly_chart(fig_prd2, use_container_width=True, key="chart_fig_prd2_21")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1090,7 +1090,7 @@ with tab4:
             xaxis_title="Annee",yaxis_title="euros/an",
             hovermode="x unified",legend=dict(orientation="h",y=1.1,x=0),height=400,
         )
-        st.plotly_chart(fig_pred2, use_container_width=True)
+        st.plotly_chart(fig_pred2, use_container_width=True, key="chart_fig_pred2_22")
 
     base_costs = list(scenarios.values())[0]
     rows2 = []
@@ -1124,7 +1124,7 @@ with tab4:
                            color="Scenario",color_discrete_sequence=["#FFB432","#2ca02c"],
                            title="Economies cumulees vs sans renovation",markers=True)
         fig_cum2.update_layout(height=300,hovermode="x unified")
-        st.plotly_chart(fig_cum2, use_container_width=True)
+        st.plotly_chart(fig_cum2, use_container_width=True, key="chart_fig_cum2_23")
 
 st.markdown("---")
 st.caption(

@@ -6,3 +6,4 @@ folium>=0.16.0
 streamlit-folium>=0.19.0
 scipy>=1.11.0
 pyproj>=3.6.0
+requests>=2.31.0

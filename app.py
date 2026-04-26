@@ -297,7 +297,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 # EN-TÊTE
 # ─────────────────────────────────────────────────────────────
-st.title("Diagnostics de Performance Énergétique")
+st.title("Diagnostics de Performance Énergétique : Données Enedis & ADEME (Open Data University)")
 st.caption(
     "Comparez votre consommation électrique avec vos voisins et estimez les économies "
     "d'une rénovation énergétique. Données ADEME × Enedis."
@@ -305,11 +305,11 @@ st.caption(
 st.markdown("---")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🗺️ Logements proches",
-    "🏘️ Ma commune",
-    "🇫🇷 Benchmark France",
-    "📈 Prévision de mes coûts",
-    "🔬 Analyses approfondies",
+    " Logements proches",
+    " Ma commune",
+    " 🇫🇷 Benchmark France",
+    " Prévision de mes coûts",
+    " Analyses approfondies",
 ])
 
 # ══════════════════════════════════════════════════════════════

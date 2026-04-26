@@ -51,6 +51,27 @@ st.markdown("""
   .dpe-label{display:inline-block;padding:3px 14px;border-radius:5px;
              font-weight:bold;font-size:1rem}
   hr.sep{border-top:2px solid #eee;margin:16px 0}
+  .stTabs [data-baseweb="tab-list"] { gap: 6px; }
+  .stTabs [data-baseweb="tab"] {
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    padding: 12px 24px !important;
+    border-radius: 8px 8px 0 0 !important;
+    background: #f0f4f8 !important;
+    color: #444 !important;
+    border: 1px solid #dde3ea !important;
+    border-bottom: none !important;
+    transition: all 0.2s ease !important;
+  }
+  .stTabs [data-baseweb="tab"]:hover {
+    background: #e2eaf3 !important;
+    color: #0072CE !important;
+  }
+  .stTabs [aria-selected="true"] {
+    background: #0072CE !important;
+    color: white !important;
+    border-color: #0072CE !important;
+  }
 </style>""", unsafe_allow_html=True)
 
 SEP = '<hr class="sep">'
@@ -217,11 +238,12 @@ def annual_table(yrs, scenarios, key_prefix):
 # SIDEBAR — ENTRÉES UTILISATEUR
 # ─────────────────────────────────────────────────────────────
 with st.sidebar:
-    try:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Logo_Enedis.svg/320px-Logo_Enedis.svg.png", width=130)
-    except Exception:
-        pass
-
+    st.markdown(
+        '<p style="font-size:1.3rem;font-weight:700;color:#0072CE;margin:0 0 4px 0">'
+        'Enedis × ADEME</p>'
+        '<p style="font-size:0.8rem;color:#888;margin:0 0 12px 0">Analyse DPE & Consommation</p>',
+        unsafe_allow_html=True,
+    )
     st.markdown("## Votre adresse")
     st.caption("Entrez votre adresse pour localiser les logements similaires les plus proches.")
     addr_input = st.text_input("Adresse complète",

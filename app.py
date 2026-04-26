@@ -305,7 +305,7 @@ st.caption(
 st.markdown("---")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    " Logements proches",
+    " Logements proches (10 plus proches) ",
     " Ma commune",
     " 🇫🇷 Benchmark France",
     " Prévision de mes coûts",

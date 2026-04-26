@@ -275,6 +275,11 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 # EN-TÊTE
 # ─────────────────────────────────────────────────────────────
+st.title("DPE & Consommation Électrique — Analyse & Prévision")
+st.caption(
+    "Comparez votre consommation électrique avec vos voisins et estimez les économies "
+    "d'une rénovation énergétique. Données ADEME × Enedis."
+)
 st.markdown("---")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([

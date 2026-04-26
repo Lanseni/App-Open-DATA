@@ -1189,7 +1189,7 @@ with tab5:
     # SECTION 3 — IMPACT CARACTERISTIQUES
     # ══════════════════════
     st.markdown("---")
-    st.markdown("### 3️⃣  L'impact des caracteristiques du bâtiment sur la consommation")
+    st.markdown("### 3️  L'impact des caracteristiques du bâtiment sur la consommation")
     st.caption(
         "À classe DPE identique, la consommation réelle peut varier fortement selon "
         "la période de construction, la qualite de l'isolation et la zone climatique."
@@ -1259,7 +1259,7 @@ with tab5:
     # SYNTHESE FINALE
     # ══════════════════════
     st.markdown("---")
-    st.markdown("### ✅ Synthese — Ce que les données nous apprennent")
+    st.markdown("###  Synthese — Ce que les données nous apprennent")
 
     s1, s2, s3 = st.columns(3)
     with s1:

@@ -1,5 +1,5 @@
 """
-Application d'analyse DPE & Consommation Électrique
+Application DPE & Consommation Electrique
 Enedis x ADEME — Open Data University
 """
 
@@ -17,90 +17,62 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
-def fmt(n, unit=""):
-    """Format number with space as thousands separator (French style)."""
-    try:
-        s = f"{int(round(n)):,}".replace(",", " ")
-        return f"{s} {unit}".strip() if unit else s
-    except Exception:
-        return str(n)
-
-
-
 # ─────────────────────────────────────────────────────────────
-# CONFIGURATION
+# CONFIG
 # ─────────────────────────────────────────────────────────────
-
 DATA_PATH = os.path.join(os.path.dirname(__file__), "DPE_enedis_1.csv")
+ELECTRICITY_PRICE = 0.2516
+DEFAULT_INCREASE   = 3
 
-ELECTRICITY_PRICE_2024 = 0.2516
-DEFAULT_PRICE_INCREASE  = 3
+DPE_COLORS = {"A":"#009900","B":"#55C400","C":"#AAFF00",
+              "D":"#FFFF00","E":"#FFB432","F":"#FF5000","G":"#FF0000"}
+DPE_TEXT   = {"A":"white","B":"white","C":"black","D":"black",
+              "E":"white","F":"white","G":"white"}
+DPE_ORDER  = ["A","B","C","D","E","F","G"]
 
-DPE_COLORS = {
-    "A":"#009900","B":"#55C400","C":"#AAFF00",
-    "D":"#FFFF00","E":"#FFB432","F":"#FF5000","G":"#FF0000",
-}
-DPE_TEXT_COLORS = {
-    "A":"white","B":"white","C":"black","D":"black","E":"white","F":"white","G":"white",
-}
-DPE_ORDER = ["A","B","C","D","E","F","G"]
+USAGE_COLS = {"conso_chauffage_ef":"Chauffage","conso_ecs_ef":"Eau Chaude",
+              "conso_eclairage_ef":"Eclairage","conso_refroidissement_ef":"Refroidissement",
+              "conso_auxiliaires_ef":"Auxiliaires"}
+USAGE_PAL  = ["#E45756","#4C78A8","#F28E2B","#76B7B2","#59A14F"]
 
-USAGE_COLS = {
-    "conso_chauffage_ef"      :"Chauffage",
-    "conso_ecs_ef"            :"Eau Chaude",
-    "conso_eclairage_ef"      :"Eclairage",
-    "conso_refroidissement_ef":"Refroidissement",
-    "conso_auxiliaires_ef"    :"Auxiliaires",
-}
-USAGE_ICONS  = {"Chauffage":"fire","Eau Chaude":"shower","Eclairage":"lightbulb",
-                "Refroidissement":"snowflake","Auxiliaires":"cogs"}
-USAGE_COLORS = ["#E45756","#4C78A8","#F28E2B","#76B7B2","#59A14F"]
+DEPERD_COLS = {"deperditions_enveloppe":"Enveloppe totale",
+               "deperditions_murs":"Murs",
+               "deperditions_planchers_bas":"Planchers bas",
+               "deperditions_planchers_hauts":"Planchers hauts"}
 
-DEPERD_COLS = {
-    "deperditions_enveloppe"     :"Enveloppe totale",
-    "deperditions_murs"          :"Murs",
-    "deperditions_planchers_bas" :"Planchers bas",
-    "deperditions_planchers_hauts":"Planchers hauts",
-}
+DPE_KWH_M2 = {"A":25.3,"B":41.4,"C":69.1,"D":96.6,"E":132.0,"F":172.0,"G":242.0}
 
-st.set_page_config(
-    page_title="DPE & Conso Electrique",
-    page_icon="lightning",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
+st.set_page_config(page_title="DPE & Conso", page_icon="⚡",
+                   layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
 <style>
   .block-container{padding-top:1.2rem}
   .stMetric{background:#f5f7fa;border-radius:10px;padding:8px 12px}
   .dpe-label{display:inline-block;padding:3px 14px;border-radius:5px;
-             font-weight:bold;font-size:1rem;letter-spacing:.5px}
-  .section-sep{border-top:2px solid #eee;margin:16px 0}
-</style>
-""", unsafe_allow_html=True)
+             font-weight:bold;font-size:1rem}
+  hr.sep{border-top:2px solid #eee;margin:16px 0}
+</style>""", unsafe_allow_html=True)
+
+SEP = '<hr class="sep">'
 
 # ─────────────────────────────────────────────────────────────
 # TRANSFORMERS
 # ─────────────────────────────────────────────────────────────
-_l93_to_wgs84 = Transformer.from_crs("EPSG:2154","EPSG:4326", always_xy=True)
-_wgs84_to_l93 = Transformer.from_crs("EPSG:4326","EPSG:2154", always_xy=True)
+_l93_wgs = Transformer.from_crs("EPSG:2154","EPSG:4326", always_xy=True)
+_wgs_l93 = Transformer.from_crs("EPSG:4326","EPSG:2154", always_xy=True)
 
 # ─────────────────────────────────────────────────────────────
-# DATA LOADING
+# DATA
 # ─────────────────────────────────────────────────────────────
-
 @st.cache_data(show_spinner="Chargement des donnees...")
 def load_data(path):
     df = pd.read_csv(path, low_memory=False)
     mask = df["coordonnee_cartographique_x_ban"] > 1000
-    lons, lats = _l93_to_wgs84.transform(
+    lons, lats = _l93_wgs.transform(
         df.loc[mask,"coordonnee_cartographique_x_ban"].values,
-        df.loc[mask,"coordonnee_cartographique_y_ban"].values,
-    )
+        df.loc[mask,"coordonnee_cartographique_y_ban"].values)
     df.loc[mask,"lon"] = lons
     df.loc[mask,"lat"] = lats
-
     df["conso_dpe_kwh"]   = df["conso_5_usages_par_m2_ef"] * df["surface_habitable_logement"]
     df["conso_relle_kwh"] = df["Consommation annuelle moyenne par logement de l'adresse (MWh)"] * 1000
     df["etiquette_dpe"]   = df["etiquette_dpe"].astype(str).str.strip().str.upper()
@@ -109,14 +81,11 @@ def load_data(path):
     df["_has_l93"]        = df["coordonnee_cartographique_x_ban"] > 1000
     return df
 
-
 @st.cache_resource(show_spinner=False)
-def build_kdtree(df):
-    valid  = df[df["_has_l93"]].copy()
-    coords = valid[["coordonnee_cartographique_x_ban",
-                     "coordonnee_cartographique_y_ban"]].values
-    return KDTree(coords), valid.index.tolist()
-
+def build_tree(df):
+    v = df[df["_has_l93"]].copy()
+    coords = v[["coordonnee_cartographique_x_ban","coordonnee_cartographique_y_ban"]].values
+    return KDTree(coords), v.index.tolist()
 
 try:
     df = load_data(DATA_PATH)
@@ -124,119 +93,129 @@ except FileNotFoundError:
     st.error(f"Fichier CSV introuvable : {DATA_PATH}")
     st.stop()
 
-tree, tree_idx = build_kdtree(df)
+tree, tree_idx = build_tree(df)
 communes_list  = sorted(df["nom_commune_ban"].dropna().unique().tolist())
 
 # ─────────────────────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────────────────────
-
-def dpe_badge(label, size="1rem"):
-    c = DPE_COLORS.get(str(label), "#888")
-    t = DPE_TEXT_COLORS.get(str(label), "white")
-    return (f'<span class="dpe-label" '
-            f'style="background:{c};color:{t};font-size:{size}"> {label} </span>')
-
+def badge(label, size="1rem"):
+    c = DPE_COLORS.get(str(label),"#888")
+    t = DPE_TEXT.get(str(label),"white")
+    return f'<span class="dpe-label" style="background:{c};color:{t};font-size:{size}"> {label} </span>'
 
 @st.cache_data(show_spinner=False, ttl=86400)
-def geocode_address(address):
-    """Geocode via API BAN officielle (adresse.data.gouv.fr)."""
+def geocode(address):
     try:
-        r = requests.get(
-            "https://api-adresse.data.gouv.fr/search/",
-            params={"q": address, "limit": 1},
-            timeout=6,
-        )
-        data = r.json()
-        if data.get("features"):
-            feat  = data["features"][0]
-            lon, lat = feat["geometry"]["coordinates"]
-            props = feat["properties"]
-            return lat, lon, props.get("label",""), props.get("score",0), props.get("city","")
+        r = requests.get("https://api-adresse.data.gouv.fr/search/",
+                         params={"q":address,"limit":1}, timeout=6)
+        d = r.json()
+        if d.get("features"):
+            f = d["features"][0]
+            lon, lat = f["geometry"]["coordinates"]
+            p = f["properties"]
+            return lat, lon, p.get("label",""), p.get("score",0), p.get("city","")
     except Exception:
         pass
     return None, None, None, None, None
 
+def nearest_from_l93(x, y, n=10):
+    dists, pos = tree.query([x,y], k=min(n, len(tree_idx)))
+    if n == 1: dists, pos = [dists],[pos]
+    res = df.loc[[tree_idx[p] for p in pos]].copy()
+    res["distance_m"] = [int(d) for d in dists]
+    return res
 
-def latlon_to_l93(lat, lon):
-    x, y = _wgs84_to_l93.transform(lon, lat)
-    return x, y
+def commune_l93(commune):
+    s = df[df["nom_commune_ban"]==commune]
+    return s["coordonnee_cartographique_x_ban"].mean(), s["coordonnee_cartographique_y_ban"].mean()
 
+def med_by_dpe(data):
+    return (data.groupby("etiquette_dpe", observed=True)
+                .agg(conso_dpe_kwh=("conso_dpe_kwh","median"),
+                     conso_relle_kwh=("conso_relle_kwh","median"),
+                     n=("conso_relle_kwh","count"))
+                .reindex(DPE_ORDER).dropna(subset=["conso_relle_kwh"]))
 
-def find_nearest_from_l93(x, y, n=10):
-    dists, positions = tree.query([x, y], k=min(n, len(tree_idx)))
-    if n == 1:
-        dists, positions = [dists], [positions]
-    indices = [tree_idx[p] for p in positions]
-    result  = df.loc[indices].copy()
-    result["distance_m"] = [int(d) for d in dists]
-    return result
+def predict_enedis(kwh, prix, taux, dpe):
+    med = med_by_dpe(df)["conso_relle_kwh"]
+    bg  = med.get("G", kwh) or kwh
+    f   = lambda c: (med.get(c)/bg) if med.get(c) and bg else 1.0
+    yrs = list(range(2025,2036)); s = {}
+    s["Sans renovation"] = [kwh*prix*(1+taux)**i for i in range(len(yrs))]
+    if dpe not in ("A","B"):
+        nk = kwh * f("B")/max(f(dpe),0.01)
+        s["Renovation → Classe B"] = [(kwh if i<2 else nk)*prix*(1+taux)**i for i in range(len(yrs))]
+    if dpe != "A":
+        nk = kwh * f("A")/max(f(dpe),0.01)
+        s["Renovation → Classe A"] = [(kwh if i<3 else nk)*prix*(1+taux)**i for i in range(len(yrs))]
+    return yrs, s
 
+def predict_3cl(kwh, prix, taux, dpe):
+    cm  = DPE_KWH_M2.get(dpe, 100.0)
+    yrs = list(range(2025,2036)); s = {}
+    s["Sans renovation"] = [kwh*prix*(1+taux)**i for i in range(len(yrs))]
+    if dpe not in ("A","B"):
+        nk = kwh * DPE_KWH_M2["B"]/cm
+        s["Renovation → Classe B"] = [(kwh if i<2 else nk)*prix*(1+taux)**i for i in range(len(yrs))]
+    if dpe != "A":
+        nk = kwh * DPE_KWH_M2["A"]/cm
+        s["Renovation → Classe A"] = [(kwh if i<3 else nk)*prix*(1+taux)**i for i in range(len(yrs))]
+    return yrs, s
 
-def commune_center_l93(commune):
-    sub = df[df["nom_commune_ban"] == commune]
-    return (sub["coordonnee_cartographique_x_ban"].mean(),
-            sub["coordonnee_cartographique_y_ban"].mean())
+def prediction_chart(yrs, scenarios, title, key):
+    fig = go.Figure()
+    for (name,costs), col_s in zip(scenarios.items(), ["#d62728","#FFB432","#2ca02c"]):
+        fig.add_trace(go.Scatter(
+            x=yrs, y=[round(c) for c in costs], mode="lines+markers", name=name,
+            line=dict(color=col_s,width=3), marker=dict(size=7),
+            hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:.0f}} euros<extra></extra>"))
+    if len(scenarios)>1:
+        fig.add_vrect(x0=2026.5, x1=2028.5, fillcolor="lightgreen", opacity=0.1,
+                      annotation_text="Fenetre renovation", annotation_position="top left")
+    fig.update_layout(title=title, xaxis_title="Annee", yaxis_title="euros/an",
+                      hovermode="x unified", legend=dict(orientation="h",y=1.1,x=0), height=360)
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
+def cumul_chart(yrs, scenarios, title, key):
+    base = list(scenarios.values())[0]
+    if len(scenarios) < 2: return
+    rows = []
+    for name, costs in list(scenarios.items())[1:]:
+        cum = 0
+        for yr,(b,a) in zip(yrs,zip(base,costs)):
+            cum += b-a
+            rows.append({"Annee":yr,"Scenario":name,"Economie cumulee (euros)":round(cum)})
+    fig = px.area(pd.DataFrame(rows), x="Annee", y="Economie cumulee (euros)",
+                  color="Scenario", color_discrete_sequence=["#FFB432","#2ca02c"],
+                  title=title, markers=True)
+    fig.update_layout(height=260, hovermode="x unified")
+    st.plotly_chart(fig, use_container_width=True, key=key)
 
-def median_conso_by_dpe(data):
-    return (
-        data.groupby("etiquette_dpe", observed=True)
-        .agg(conso_dpe_kwh=("conso_dpe_kwh","median"),
-             conso_relle_kwh=("conso_relle_kwh","median"),
-             n=("conso_relle_kwh","count"))
-        .reindex(DPE_ORDER).dropna(subset=["conso_relle_kwh"])
-    )
+def savings_metrics(scenarios, label=""):
+    base_total = sum(list(scenarios.values())[0])
+    for name, costs in list(scenarios.items())[1:]:
+        saving = base_total - sum(costs)
+        st.metric(name.replace("Renovation → ","→ "),
+                  f"{sum(costs):.0f} euros",
+                  delta=f"-{saving:.0f} euros" if saving>0 else "Reference",
+                  delta_color="inverse" if saving>0 else "off")
 
-
-def predict_costs(kwh_year, prix, taux, dpe_cur):
-    """Prediction basee sur les medianes de consommation reelle Enedis par classe DPE."""
-    conso_med = median_conso_by_dpe(df)["conso_relle_kwh"]
-    base_g    = conso_med.get("G", kwh_year) or kwh_year
-    def factor(cls):
-        v = conso_med.get(cls)
-        return (v/base_g) if v and base_g else 1.0
-    years = list(range(2025, 2036))
-    s = {}
-    s["Sans renovation"] = [kwh_year*prix*(1+taux)**i for i in range(len(years))]
-    if dpe_cur not in ("A","B"):
-        r  = factor("B")/max(factor(dpe_cur),0.01)
-        nk = kwh_year*r
-        s["Renovation -> Classe B"] = [(kwh_year if i<2 else nk)*prix*(1+taux)**i for i in range(len(years))]
-    if dpe_cur != "A":
-        r  = factor("A")/max(factor(dpe_cur),0.01)
-        nk = kwh_year*r
-        s["Renovation -> Classe A"] = [(kwh_year if i<3 else nk)*prix*(1+taux)**i for i in range(len(years))]
-    return years, s
-
-
-def predict_costs_3cl(kwh_year, prix, taux, dpe_cur):
-    """
-    Prediction basee sur le standard DPE 3CL (methode officielle de calcul thermique).
-    Les ratios de reduction correspondent au potentiel technique reel de la renovation.
-    Source : medianes kWh/m2/an calcules sur le dataset ADEME (methode 3CL).
-    """
-    DPE_KWH_M2 = {
-        "A": 25.3, "B": 41.4, "C": 69.1,
-        "D": 96.6, "E": 132.0, "F": 172.0, "G": 242.0,
-    }
-    cur_m2 = DPE_KWH_M2.get(dpe_cur, 100.0)
-    years  = list(range(2025, 2036))
-    s = {}
-    s["Sans renovation"] = [kwh_year*prix*(1+taux)**i for i in range(len(years))]
-    if dpe_cur not in ("A", "B"):
-        nk_b = kwh_year * (DPE_KWH_M2["B"] / cur_m2)
-        s["Renovation -> Classe B"] = [(kwh_year if i<2 else nk_b)*prix*(1+taux)**i for i in range(len(years))]
-    if dpe_cur != "A":
-        nk_a = kwh_year * (DPE_KWH_M2["A"] / cur_m2)
-        s["Renovation -> Classe A"] = [(kwh_year if i<3 else nk_a)*prix*(1+taux)**i for i in range(len(years))]
-    return years, s
-
+def annual_table(yrs, scenarios, key_prefix):
+    base = list(scenarios.values())[0]
+    rows = []
+    for yr, b in zip(yrs, base):
+        row = {"Annee":yr, list(scenarios.keys())[0]: f"{b:.0f}"}
+        for name, costs in list(scenarios.items())[1:]:
+            c = costs[yrs.index(yr)]
+            row[name] = f"{c:.0f}"
+            row["Economie (euros)"] = f"{b-c:.0f}"
+        rows.append(row)
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 # ─────────────────────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────────────────────
-
 with st.sidebar:
     try:
         st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Logo_Enedis.svg/320px-Logo_Enedis.svg.png", width=130)
@@ -244,89 +223,573 @@ with st.sidebar:
         pass
 
     st.markdown("## Votre adresse")
-    address_input = st.text_input(
-        "Adresse complete",
-        placeholder="Ex : 12 rue Jean Jaures, Orleans",
-        help="Geocodage via l'API officielle BAN (adresse.data.gouv.fr).",
-    )
-    geocode_btn = st.button("Geolocaliser & Analyser", type="primary", use_container_width=True)
+    addr_input = st.text_input("Adresse complete",
+                               placeholder="Ex: 12 rue Jean Jaures, Orleans",
+                               help="Geocodage via l'API BAN (adresse.data.gouv.fr).")
+    geo_btn = st.button("Geolocaliser & Analyser", type="primary", use_container_width=True)
 
-    if geocode_btn and address_input.strip():
-        with st.spinner("Geocodage en cours..."):
-            lat, lon, label, score, city = geocode_address(address_input.strip())
+    if geo_btn and addr_input.strip():
+        with st.spinner("Geocodage..."):
+            lat, lon, lbl, score, city = geocode(addr_input.strip())
         if lat:
-            st.session_state.update({
-                "geo_lat":lat,"geo_lon":lon,
-                "geo_label":label,"geo_city":city,"geo_score":score,
-            })
+            st.session_state.update({"geo_lat":lat,"geo_lon":lon,
+                                     "geo_label":lbl,"geo_city":city,"geo_score":score})
         else:
-            st.error("Adresse introuvable. Verifiez la saisie.")
+            st.error("Adresse introuvable.")
             for k in ["geo_lat","geo_lon","geo_label","geo_city","geo_score"]:
                 st.session_state.pop(k, None)
 
     if "geo_label" in st.session_state:
-        st.success(f"{st.session_state['geo_label']}")
-        st.caption(f"Confiance geocodage : {int(st.session_state.get('geo_score',0)*100)}%")
+        st.success(st.session_state["geo_label"])
+        st.caption(f"Confiance : {int(st.session_state.get('geo_score',0)*100)}%")
 
     st.markdown("---")
     st.markdown("## Votre logement")
 
-    default_city  = st.session_state.get("geo_city","")
-    matched       = next((c for c in communes_list if default_city.lower() in c.lower()), None) if default_city else None
-    default_idx   = communes_list.index(matched) if matched else (
-        communes_list.index("Orleans") if "Orleans" in communes_list else 0
-    )
-    commune = st.selectbox(
-        "Commune (onglets 2-3)",
-        communes_list,
-        index=default_idx,
-        help=(
-            "Le dataset couvre ~400 communes. "
-            "Les grandes villes (Paris, Lyon, Marseille, Nice, Strasbourg...) "
-            "ne sont pas disponibles car Enedis n y publie pas de donnees "
-            "a la maille adresse (moins de 10 logements par adresse)."
-        ),
-    )
-    # Avertissement si commune tapee mais non trouvee
-    if default_city and not matched:
-        st.warning(
-            f"**{default_city}** n est pas dans le dataset Enedis. "
-            "Les grandes metropoles (Nice, Paris, Lyon, Marseille...) sont absentes "
-            "car les donnees Enedis ne sont publiees que pour les adresses "
-            "avec au moins 10 logements. La commune la plus proche est selectionnee."
-        )
-    type_batiment = st.selectbox("Type de batiment", ["appartement","maison","immeuble"])
-    surface       = st.slider("Surface habitable (m2)", 15, 300, 65, step=5)
-    dpe_actuel    = st.select_slider("Classe DPE actuelle", options=DPE_ORDER, value="D")
-    periode_construction = st.selectbox(
-        "Periode de construction",
-        ["Inconnue","Avant 1948","1948-1974","1975-1989",
-         "1990-2000","2001-2005","2006-2012","2013-2021","Apres 2021"],
-    )
-    st.markdown(f"Classe : {dpe_badge(dpe_actuel)}", unsafe_allow_html=True)
+    geo_city  = st.session_state.get("geo_city","")
+    matched   = next((c for c in communes_list if geo_city.lower() in c.lower()), None) if geo_city else None
+    def_idx   = communes_list.index(matched) if matched else (
+                communes_list.index("Orleans") if "Orleans" in communes_list else 0)
+    commune   = st.selectbox("Commune (onglets 2-3)", communes_list, index=def_idx,
+                             help="Grandes metropoles absentes du dataset Enedis (min 10 logements/adresse).")
+    if geo_city and not matched:
+        st.warning(f"**{geo_city}** absent du dataset. Grandes villes (Nice, Paris, Lyon...) non disponibles.")
+
+    type_bat  = st.selectbox("Type de batiment", ["appartement","maison","immeuble"])
+    surface   = st.slider("Surface habitable (m2)", 15, 300, 65, step=5)
+    dpe_cur   = st.select_slider("Classe DPE actuelle", options=DPE_ORDER, value="D")
+    periode   = st.selectbox("Periode de construction",
+                             ["Inconnue","Avant 1948","1948-1974","1975-1989",
+                              "1990-2000","2001-2005","2006-2012","2013-2021","Apres 2021"])
+    st.markdown(f"Classe : {badge(dpe_cur)}", unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### Hypotheses tarifaires")
-    prix_kwh    = st.number_input("Prix actuel (euros/kWh)", 0.10, 1.0, ELECTRICITY_PRICE_2024, 0.01)
-    taux_hausse = st.slider("Hausse annuelle (%)", 0, 10, DEFAULT_PRICE_INCREASE) / 100
-
-    st.markdown("---")
-    st.caption(f"Base : {len(df):,} logements - {len(communes_list)} communes")
-
+    prix_kwh    = st.number_input("Prix (euros/kWh)", 0.10, 1.0, ELECTRICITY_PRICE, 0.01)
+    taux_hausse = st.slider("Hausse annuelle (%)", 0, 10, DEFAULT_INCREASE) / 100
+    st.caption(f"Base : {len(df):,} logements · {len(communes_list)} communes")
 
 # ─────────────────────────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────────────────────────
 st.title("DPE & Consommation Electrique — Analyse & Prediction")
-st.caption("Donnees ADEME (DPE) x Enedis (consommations reelles Linky). Saisissez votre adresse pour une analyse geolocalise.")
+st.caption("Donnees ADEME (DPE) x Enedis (consommations reelles Linky).")
 st.markdown("---")
 
 tab1, tab2, tab3, tab4 = st.tabs([
-    "Logements proches",
-    "Analyse commune",
-    "Analyse France",
-    "Prediction 10 ans",
+    "🗺️ Logements proches",
+    "🏘️ Analyse commune",
+    "🇫🇷 Analyse France",
+    "📈 Prediction 10 ans",
 ])
+
+# ══════════════════════════════════════════════════════════════
+# TAB 1 — LOGEMENTS PROCHES
+# ══════════════════════════════════════════════════════════════
+with tab1:
+    has_geo = "geo_lat" in st.session_state
+    if has_geo:
+        u_lat, u_lon = st.session_state["geo_lat"], st.session_state["geo_lon"]
+        u_x, u_y    = _wgs_l93.transform(u_lon, u_lat)
+        ref_lbl     = st.session_state["geo_label"]
+        nearest     = nearest_from_l93(u_x, u_y)
+        st.info(f"📍 **{ref_lbl}**")
+    else:
+        cx, cy = commune_l93(commune)
+        u_x, u_y = cx, cy
+        u_lon, u_lat = _l93_wgs.transform(cx, cy)
+        ref_lbl  = f"Centre de {commune}"
+        nearest  = nearest_from_l93(cx, cy)
+        st.warning(f"Saisissez votre adresse pour une analyse precise. Reference : **{commune}**.")
+
+    if nearest.empty:
+        st.error("Aucun logement trouve.")
+        st.stop()
+
+    # ── KPIs ──
+    st.markdown("### Vue d'ensemble des 10 logements")
+    pct_pass  = nearest["etiquette_dpe"].isin(["F","G"]).mean()*100
+    dist_max  = nearest["distance_m"].max()
+    med_reel  = nearest["conso_relle_kwh"].median()
+    med_dpe   = nearest["conso_dpe_kwh"].median()
+    ecart_pct = (med_reel-med_dpe)/med_dpe*100 if med_dpe else 0
+    dpe_dom   = nearest["etiquette_dpe"].astype(str).mode()[0]
+
+    k1,k2,k3,k4,k5 = st.columns(5)
+    k1.metric("Rayon couvert",        f"{dist_max:.0f} m", f"moy {nearest['distance_m'].mean():.0f} m")
+    k2.metric("DPE dominant",         dpe_dom)
+    k3.metric("Conso reelle mediane", f"{med_reel:.0f} kWh")
+    k4.metric("Conso DPE mediane",    f"{med_dpe:.0f} kWh", f"{ecart_pct:+.1f}% vs estime")
+    k5.metric("Passoires (F+G)",      f"{pct_pass:.0f}%")
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── CARTE ──
+    st.markdown("### Carte interactive")
+    m = folium.Map(location=[(nearest["lat"].mean()+u_lat)/2,
+                              (nearest["lon"].mean()+u_lon)/2],
+                   zoom_start=14, tiles="CartoDB positron")
+    folium.Marker([u_lat,u_lon], tooltip="Votre adresse",
+                  icon=folium.Icon(color="blue",icon="home",prefix="fa"),
+                  popup=folium.Popup(f"<b>{ref_lbl}</b>",max_width=260)).add_to(m)
+    folium.Circle([u_lat,u_lon], radius=int(dist_max),
+                  color="#1f77b4", fill=False, weight=1.5, dash_array="6").add_to(m)
+
+    for rank, (_, row) in enumerate(nearest.iterrows(), 1):
+        if pd.isna(row.get("lat")): continue
+        dpe  = str(row["etiquette_dpe"])
+        chex = DPE_COLORS.get(dpe,"#888")
+        tw   = "white" if dpe in("A","B","E","F","G") else "black"
+        surf = row.get("surface_habitable_logement",0)
+        dkwh = row.get("conso_dpe_kwh",0) or 0
+        rkwh = row.get("conso_relle_kwh",0) or 0
+        ecrt = (rkwh-dkwh)/dkwh*100 if dkwh else 0
+        cout = rkwh*prix_kwh
+        tot  = row.get("conso_5_usages_ef",1) or 1
+        ch_p = row.get("conso_chauffage_ef",0)/tot*100
+        ec_p = row.get("conso_ecs_ef",0)/tot*100
+        el_p = row.get("conso_eclairage_ef",0)/tot*100
+
+        popup = f"""<div style='font-family:Arial;min-width:260px;font-size:12.5px;line-height:1.65'>
+          <div style='background:{chex};color:{tw};padding:4px 10px;border-radius:4px;
+               font-weight:bold;font-size:14px;margin-bottom:6px'>#{rank} — DPE {dpe}</div>
+          <b>Adresse :</b> {row.get('adresse_ban','N/A')}<br>
+          <b>Type :</b> {row.get('type_batiment','N/A')} | <b>Surface :</b> {surf:.0f} m2<br>
+          <b>Periode :</b> {row.get('periode_construction','N/A')}<br>
+          <hr style='margin:5px 0'>
+          <b>Conso DPE estimee (3CL)</b><br>
+          Total : <b>{dkwh:.0f} kWh/an</b> ({row.get('conso_5_usages_par_m2_ef',0):.0f} kWh/m2)<br>
+          Chauffage : {row.get('conso_chauffage_ef',0):.0f} kWh ({ch_p:.0f}%) |
+          ECS : {row.get('conso_ecs_ef',0):.0f} kWh ({ec_p:.0f}%)<br>
+          Eclairage : {row.get('conso_eclairage_ef',0):.0f} kWh ({el_p:.0f}%)<br>
+          <hr style='margin:5px 0'>
+          <b>Conso reelle Enedis</b><br>
+          <b>{rkwh:.0f} kWh/an</b>
+          (<span style='color:{"#c0392b" if ecrt>0 else "#27ae60"}'>{ecrt:+.1f}%</span>)<br>
+          Cout : <b>{cout:.0f} euros/an</b><br>
+          <hr style='margin:5px 0'>
+          Isolation murs : {row.get('qualite_isolation_murs','N/A')}<br>
+          Deperditions enveloppe : {row.get('deperditions_enveloppe',0):.0f} W/K<br>
+          <b>Distance :</b> {row.get('distance_m',0):,} m
+        </div>"""
+
+        folium.CircleMarker([row["lat"],row["lon"]], radius=18, color="white", weight=2,
+                            fill=True, fill_color=chex, fill_opacity=0.88,
+                            popup=folium.Popup(popup,max_width=300),
+                            tooltip=f"#{rank} · DPE {dpe} · {surf:.0f}m2").add_to(m)
+        folium.Marker([row["lat"],row["lon"]],
+                      icon=folium.DivIcon(
+                          html=f'<div style="color:{tw};font-weight:bold;font-size:12px;'
+                               f'text-align:center;line-height:22px;width:22px">{rank}</div>',
+                          icon_size=(22,22), icon_anchor=(11,11))).add_to(m)
+
+    st_folium(m, height=460, use_container_width=True)
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── CONSOMMATIONS ──
+    st.markdown("### Analyse des consommations")
+    c1, c2 = st.columns(2)
+    with c1:
+        nb = nearest.sort_values("distance_m").copy()
+        nb["lbl"] = [f"#{i+1}" for i in range(len(nb))]
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="DPE estime", x=nb["lbl"], y=nb["conso_dpe_kwh"],
+                             marker_color="#4C78A8", opacity=0.85,
+                             hovertemplate="<b>%{x}</b><br>DPE : %{y:.0f} kWh<extra></extra>"))
+        fig.add_trace(go.Bar(name="Reel Enedis", x=nb["lbl"], y=nb["conso_relle_kwh"],
+                             marker_color="#F28E2B", opacity=0.85,
+                             hovertemplate="<b>%{x}</b><br>Reel : %{y:.0f} kWh<extra></extra>"))
+        fig.update_layout(barmode="group", title="DPE estime vs Reel par logement",
+                          xaxis_title="Logement", yaxis_title="kWh/an",
+                          legend=dict(orientation="h",y=-0.22), height=360)
+        st.plotly_chart(fig, use_container_width=True, key="t1_cmp")
+
+    with c2:
+        nb["ecart_pct"] = (nb["conso_relle_kwh"]-nb["conso_dpe_kwh"]) \
+                         / nb["conso_dpe_kwh"].replace(0,np.nan)*100
+        fig2 = go.Figure(go.Bar(
+            x=nb["lbl"], y=nb["ecart_pct"],
+            marker_color=["#c0392b" if v>0 else "#27ae60" for v in nb["ecart_pct"]],
+            text=[f"{v:+.1f}%" for v in nb["ecart_pct"]], textposition="outside",
+            hovertemplate="<b>%{x}</b><br>Ecart : %{y:+.1f}%<extra></extra>"))
+        fig2.add_hline(y=0, line_dash="dash", line_color="grey")
+        fig2.update_layout(title="Ecart reel vs DPE (%)",
+                           xaxis_title="Logement", yaxis_title="%", height=360)
+        st.caption("Rouge = reel > DPE | Vert = reel < DPE")
+        st.plotly_chart(fig2, use_container_width=True, key="t1_ecart")
+
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── USAGES ──
+    st.markdown("### Detail par usage (DPE estime)")
+    c3, c4 = st.columns(2)
+    with c3:
+        urows = []
+        for i,(_, row) in enumerate(nearest.iterrows(), 1):
+            for col,lbl in USAGE_COLS.items():
+                v = row.get(col,0)
+                if pd.notna(v) and v>0:
+                    urows.append({"Logement":f"#{i}","Usage":lbl,"kWh/an":round(v)})
+        if urows:
+            fig3 = px.bar(pd.DataFrame(urows), x="Logement", y="kWh/an", color="Usage",
+                          color_discrete_sequence=USAGE_PAL,
+                          title="Decomposition par usage", barmode="stack")
+            fig3.update_layout(height=350, legend=dict(orientation="h",y=-0.3))
+            st.plotly_chart(fig3, use_container_width=True, key="t1_stack")
+
+    with c4:
+        avg_u = {lbl: nearest[col].mean() for col,lbl in USAGE_COLS.items()
+                 if col in nearest.columns}
+        avg_u = {k:v for k,v in avg_u.items() if pd.notna(v) and v>0}
+        if avg_u:
+            fig4 = px.pie(values=list(avg_u.values()), names=list(avg_u.keys()),
+                          color_discrete_sequence=USAGE_PAL,
+                          title="Repartition moyenne des usages", hole=0.38)
+            fig4.update_traces(texttemplate="%{label}<br>%{percent:.0%}")
+            fig4.update_layout(height=350, showlegend=False)
+            st.plotly_chart(fig4, use_container_width=True, key="t1_pie")
+
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── THERMIQUE ──
+    st.markdown("### Deperditions thermiques & isolation")
+    c5, c6 = st.columns(2)
+    with c5:
+        drows = []
+        for i,(_, row) in enumerate(nearest.iterrows(), 1):
+            for col,lbl in DEPERD_COLS.items():
+                v = row.get(col,0)
+                if pd.notna(v) and v>0:
+                    drows.append({"Logement":f"#{i}","Composant":lbl,"W/K":round(v,1)})
+        if drows:
+            ddf = pd.DataFrame(drows)
+            fig5 = px.bar(ddf[ddf["Composant"]!="Enveloppe totale"],
+                          x="Logement", y="W/K", color="Composant",
+                          title="Deperditions par composant (W/K)", barmode="group",
+                          color_discrete_sequence=["#e15759","#f28e2b","#76b7b2"])
+            fig5.update_layout(height=330, legend=dict(orientation="h",y=-0.3))
+            st.plotly_chart(fig5, use_container_width=True, key="t1_dep")
+
+    with c6:
+        iso1 = nearest["qualite_isolation_enveloppe"].dropna().value_counts()
+        iso2 = nearest["qualite_isolation_murs"].dropna().value_counts()
+        if not iso1.empty or not iso2.empty:
+            fig6 = go.Figure()
+            if not iso1.empty:
+                fig6.add_trace(go.Bar(name="Enveloppe", x=iso1.index, y=iso1.values,
+                                      marker_color="#4C78A8",
+                                      text=iso1.values, textposition="outside"))
+            if not iso2.empty:
+                fig6.add_trace(go.Bar(name="Murs", x=iso2.index, y=iso2.values,
+                                      marker_color="#F28E2B", opacity=0.8,
+                                      text=iso2.values, textposition="outside"))
+            fig6.update_layout(barmode="group", title="Qualite d'isolation",
+                               yaxis_title="Nb logements", height=330,
+                               legend=dict(orientation="h",y=-0.25))
+            st.plotly_chart(fig6, use_container_width=True, key="t1_iso")
+
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── TABLEAU COMPLET ──
+    st.markdown("### Tableau recapitulatif complet")
+    rcols = {"distance_m":"Dist.(m)","etiquette_dpe":"DPE","score_dpe":"Score",
+             "type_batiment":"Type","surface_habitable_logement":"Surface(m2)",
+             "periode_construction":"Periode","qualite_isolation_enveloppe":"Iso.env",
+             "qualite_isolation_murs":"Iso.murs","zone_climatique":"Zone",
+             "conso_5_usages_par_m2_ef":"kWh/m2","conso_dpe_kwh":"kWh DPE",
+             "conso_relle_kwh":"kWh Reel","conso_chauffage_ef":"Chauf.",
+             "conso_ecs_ef":"ECS","conso_eclairage_ef":"Eclair.",
+             "deperditions_enveloppe":"Dep.env(W/K)","deperditions_murs":"Dep.murs(W/K)",
+             "Nombre de logements":"Nb.log"}
+    avail = {k:v for k,v in rcols.items() if k in nearest.columns}
+    rec   = nearest[list(avail.keys())].copy()
+    rec.columns = list(avail.values())
+    rec.index   = [f"#{i+1}" for i in range(len(rec))]
+    if "kWh Reel" in rec.columns:
+        rec.insert(rec.columns.get_loc("kWh Reel")+1,
+                   "Cout/an(euros)", (rec["kWh Reel"]*prix_kwh).round(0))
+    st.dataframe(rec, use_container_width=True, height=350)
+    st.download_button("Telecharger CSV", rec.to_csv(encoding="utf-8-sig"),
+                       "dpe_10_proches.csv", "text/csv")
+
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── FICHES INDIVIDUELLES ──
+    st.markdown("### Fiches individuelles")
+    st.caption("Cliquez pour developper la fiche complete.")
+    for rank, (_, row) in enumerate(nearest.iterrows(), 1):
+        dpe  = str(row.get("etiquette_dpe","?"))
+        surf = row.get("surface_habitable_logement",0)
+        rkwh = row.get("conso_relle_kwh",0) or 0
+        dkwh = row.get("conso_dpe_kwh",0) or 0
+        dist = row.get("distance_m",0)
+        ecrt = (rkwh-dkwh)/dkwh*100 if dkwh else 0
+        cout = rkwh*prix_kwh
+        with st.expander(f"#{rank} — {row.get('adresse_ban','N/A')}  |  "
+                         f"DPE {dpe}  |  {surf:.0f} m2  |  {dist:,} m  |  {rkwh:.0f} kWh/an"):
+            fa, fb, fc = st.columns(3)
+            with fa:
+                st.markdown("**Caracteristiques**")
+                st.markdown(f"""| Champ | Valeur |
+|---|---|
+| Type | {row.get('type_batiment','N/A')} |
+| Surface | {surf:.0f} m2 |
+| Periode | {row.get('periode_construction','N/A')} |
+| Zone clim. | {row.get('zone_climatique','N/A')} |
+| Nb logements | {row.get('Nombre de logements','N/A')} |
+| Score DPE | {row.get('score_dpe','N/A')} |
+| Energie chauf. | {row.get('type_energie_principale_chauffage','N/A')} |
+| Energie ECS | {row.get('type_energie_principale_ecs','N/A')} |""")
+            with fb:
+                st.markdown("**Consommations**")
+                st.markdown(f"""| Usage | kWh/an |  % |
+|---|---|---|
+| Chauffage | {row.get('conso_chauffage_ef',0):.0f} | {row.get('conso_chauffage_ef',0)/max(dkwh,1)*100:.0f}% |
+| ECS | {row.get('conso_ecs_ef',0):.0f} | {row.get('conso_ecs_ef',0)/max(dkwh,1)*100:.0f}% |
+| Eclairage | {row.get('conso_eclairage_ef',0):.0f} | {row.get('conso_eclairage_ef',0)/max(dkwh,1)*100:.0f}% |
+| Refroid. | {row.get('conso_refroidissement_ef',0):.0f} | — |
+| Auxiliaires | {row.get('conso_auxiliaires_ef',0):.0f} | — |
+| **Total DPE** | **{dkwh:.0f}** | |
+| **Reel Enedis** | **{rkwh:.0f}** | |
+| Ecart | {ecrt:+.1f}% | |
+| **Cout/an** | **{cout:.0f} euros** | |""")
+                use_vals = {lbl:row.get(col,0) for col,lbl in USAGE_COLS.items()}
+                use_vals = {k:v for k,v in use_vals.items() if pd.notna(v) and v>0}
+                if use_vals:
+                    fp = px.pie(values=list(use_vals.values()), names=list(use_vals.keys()),
+                                color_discrete_sequence=USAGE_PAL, hole=0.4, height=200)
+                    fp.update_traces(texttemplate="%{percent:.0%}", textposition="inside")
+                    fp.update_layout(margin=dict(t=10,b=5,l=0,r=0), showlegend=True,
+                                     legend=dict(font_size=9))
+                    st.plotly_chart(fp, use_container_width=True, key=f"pie_{rank}")
+            with fc:
+                st.markdown("**Isolation & Thermique**")
+                st.markdown(f"""| Composant | Valeur |
+|---|---|
+| Iso. murs | {row.get('qualite_isolation_murs','N/A')} |
+| Iso. enveloppe | {row.get('qualite_isolation_enveloppe','N/A')} |
+| Dep. enveloppe | {row.get('deperditions_enveloppe',0):.0f} W/K |
+| Dep. murs | {row.get('deperditions_murs',0):.0f} W/K |
+| Dep. pl. bas | {row.get('deperditions_planchers_bas',0):.0f} W/K |
+| Dep. pl. hauts | {row.get('deperditions_planchers_hauts',0):.0f} W/K |""")
+                score = float(row.get("score_dpe",0) or 0)
+                fg = go.Figure(go.Indicator(
+                    mode="gauge+number", value=score,
+                    title={"text":f"Score DPE · Classe {dpe}","font":{"size":12}},
+                    gauge={"axis":{"range":[0,700]},
+                           "bar":{"color":DPE_COLORS.get(dpe,"#888")},
+                           "steps":[{"range":[0,70],"color":"#009900"},
+                                    {"range":[70,110],"color":"#55C400"},
+                                    {"range":[110,180],"color":"#AAFF00"},
+                                    {"range":[180,250],"color":"#FFFF00"},
+                                    {"range":[250,330],"color":"#FFB432"},
+                                    {"range":[330,420],"color":"#FF5000"},
+                                    {"range":[420,700],"color":"#FF0000"}]}))
+                fg.update_layout(height=200, margin=dict(t=35,b=5,l=10,r=10))
+                st.plotly_chart(fg, use_container_width=True, key=f"gauge_{rank}")
+
+    st.markdown(SEP, unsafe_allow_html=True)
+
+    # ── POSITIONNEMENT ──
+    st.markdown("### Positionnement vs commune et France")
+    c9, c10 = st.columns(2)
+    with c9:
+        nat_m  = df["conso_relle_kwh"].median()
+        com_m  = df[df["nom_commune_ban"]==commune]["conso_relle_kwh"].median()
+        near_m = nearest["conso_relle_kwh"].median()
+        cmp = pd.DataFrame({"Niveau":["France",commune,"10 proches"],
+                             "kWh/an":[nat_m,com_m,near_m]}).dropna()
+        fig7 = px.bar(cmp, x="Niveau", y="kWh/an", color="Niveau",
+                      color_discrete_sequence=["#1f77b4","#2ca02c","#d62728"],
+                      title="Conso reelle mediane — comparaison", text="kWh/an")
+        fig7.update_traces(texttemplate="%{text:.0f} kWh", textposition="outside")
+        fig7.update_layout(showlegend=False, height=320)
+        st.plotly_chart(fig7, use_container_width=True, key="t1_pos")
+
+    with c10:
+        nat_s = df["conso_relle_kwh"].dropna().sample(min(5000,len(df)), random_state=42)
+        fig8  = go.Figure()
+        fig8.add_trace(go.Histogram(x=nat_s, name="France", opacity=0.4,
+                                    marker_color="#1f77b4",
+                                    xbins=dict(size=500), histnorm="percent"))
+        for v in nearest["conso_relle_kwh"].dropna():
+            fig8.add_vline(x=v, line_width=1.5, line_color="#d62728", opacity=0.6)
+        fig8.add_vline(x=near_m, line_width=2.5, line_color="#d62728",
+                       annotation_text="Mediane proches", annotation_position="top right")
+        fig8.update_layout(title="Distribution nationale vs vos 10 proches",
+                           xaxis_title="kWh/an", yaxis_title="%", height=320,
+                           xaxis_range=[0, min(nat_s.quantile(0.97)*1.1, 14000)])
+        st.plotly_chart(fig8, use_container_width=True, key="t1_hist")
+
+
+# ══════════════════════════════════════════════════════════════
+# TAB 2 — ANALYSE COMMUNE
+# ══════════════════════════════════════════════════════════════
+with tab2:
+    st.subheader(f"Analyse de la commune : {commune}")
+    com_df = df[df["nom_commune_ban"]==commune].copy()
+    if com_df.empty:
+        st.warning(f"Aucune donnee pour {commune}.")
+    else:
+        pct_p = com_df["etiquette_dpe"].isin(["F","G"]).mean()*100
+        m1,m2,m3,m4 = st.columns(4)
+        m1.metric("Logements", f"{len(com_df):,}")
+        m2.metric("Conso reelle mediane", f"{com_df['conso_relle_kwh'].median():.0f} kWh/an")
+        m3.metric("Conso DPE mediane",    f"{com_df['conso_dpe_kwh'].median():.0f} kWh/an")
+        m4.metric("Passoires (F+G)",      f"{pct_p:.1f}%")
+        st.markdown("---")
+
+        c1,c2 = st.columns(2)
+        with c1:
+            cnt = com_df["etiquette_dpe"].astype(str).value_counts().reindex(DPE_ORDER,fill_value=0)
+            fig = px.bar(x=cnt.index, y=cnt.values, color=cnt.index,
+                         color_discrete_map=DPE_COLORS,
+                         title=f"Distribution DPE — {commune}",
+                         labels={"x":"Classe","y":"Nb logements"}, text=cnt.values)
+            fig.update_traces(textposition="outside")
+            fig.update_layout(showlegend=False, height=340)
+            st.plotly_chart(fig, use_container_width=True, key="t2_dist")
+        with c2:
+            mc = med_by_dpe(com_df).reset_index()
+            fig = go.Figure()
+            fig.add_trace(go.Bar(name="DPE estime", x=mc["etiquette_dpe"],
+                                 y=mc["conso_dpe_kwh"], marker_color="#4C9BE8", opacity=0.8))
+            fig.add_trace(go.Bar(name="Reel Enedis", x=mc["etiquette_dpe"],
+                                 y=mc["conso_relle_kwh"], marker_color="#F28B30", opacity=0.8))
+            fig.update_layout(barmode="group", title=f"Conso mediane par classe — {commune}",
+                              xaxis_title="DPE", yaxis_title="kWh/an",
+                              height=340, legend=dict(orientation="h",y=-0.22))
+            st.plotly_chart(fig, use_container_width=True, key="t2_grp")
+
+        c3,c4 = st.columns(2)
+        with c3:
+            sc = com_df.dropna(subset=["conso_dpe_kwh","conso_relle_kwh"])
+            sc = sc[sc["conso_relle_kwh"]<sc["conso_relle_kwh"].quantile(0.99)]
+            if not sc.empty:
+                fig = px.scatter(sc, x="conso_dpe_kwh", y="conso_relle_kwh",
+                                 color="etiquette_dpe", color_discrete_map=DPE_COLORS,
+                                 title=f"DPE estime vs Reel — {commune}",
+                                 labels={"conso_dpe_kwh":"DPE (kWh)","conso_relle_kwh":"Reel (kWh)",
+                                         "etiquette_dpe":"Classe"},
+                                 opacity=0.55, height=340)
+                mx = max(sc["conso_dpe_kwh"].max(), sc["conso_relle_kwh"].max())
+                fig.add_trace(go.Scatter(x=[0,mx],y=[0,mx],mode="lines",
+                                         line=dict(dash="dash",color="grey"),
+                                         name="Estimation parfaite"))
+                st.plotly_chart(fig, use_container_width=True, key="t2_scatter")
+        with c4:
+            mc2 = med_by_dpe(com_df)["conso_relle_kwh"]
+            gains = []
+            for i in range(len(DPE_ORDER)-1):
+                fr, to = DPE_ORDER[i+1], DPE_ORDER[i]
+                if fr in mc2.index and to in mc2.index and mc2[fr]-mc2[to]>0:
+                    g = mc2[fr]-mc2[to]
+                    gains.append({"Passage":f"{fr}→{to}","kWh/an":round(g),
+                                  "euros/an":round(g*prix_kwh)})
+            if gains:
+                gdf = pd.DataFrame(gains)
+                fig = px.bar(gdf, x="Passage", y="kWh/an",
+                             title=f"Gains par amelioration DPE — {commune}",
+                             color="kWh/an",color_continuous_scale=["#FF5000","#55C400"],
+                             text="euros/an", height=340)
+                fig.update_traces(texttemplate="%{text} euros/an", textposition="outside")
+                fig.update_coloraxes(showscale=False)
+                st.plotly_chart(fig, use_container_width=True, key="t2_gains")
+
+        st.markdown("### Recapitulatif par classe DPE")
+        tbl = med_by_dpe(com_df).reset_index()
+        tbl["Cout median (euros/an)"] = (tbl["conso_relle_kwh"]*prix_kwh).round(0).astype("Int64")
+        tbl.columns = ["Classe DPE","Conso DPE (kWh)","Conso reelle (kWh)","Nb log","Cout (euros/an)"]
+        for c_ in ["Conso DPE (kWh)","Conso reelle (kWh)"]:
+            tbl[c_] = tbl[c_].round(0).astype("Int64")
+        st.dataframe(tbl, use_container_width=True, hide_index=True)
+
+
+# ══════════════════════════════════════════════════════════════
+# TAB 3 — ANALYSE FRANCE
+# ══════════════════════════════════════════════════════════════
+with tab3:
+    st.subheader("Analyse nationale — Benchmark toutes communes")
+    ppt = df["etiquette_dpe"].isin(["F","G"]).mean()*100
+    n1,n2,n3,n4 = st.columns(4)
+    n1.metric("Total logements",      f"{len(df):,}")
+    n2.metric("Conso reelle mediane", f"{df['conso_relle_kwh'].median():.0f} kWh/an")
+    n3.metric("Conso DPE mediane",    f"{df['conso_dpe_kwh'].median():.0f} kWh/an")
+    n4.metric("Passoires (F+G)",      f"{ppt:.1f}%")
+    st.markdown("---")
+
+    c1,c2 = st.columns(2)
+    with c1:
+        cnt = df["etiquette_dpe"].astype(str).value_counts().reindex(DPE_ORDER,fill_value=0)
+        fig = px.pie(values=cnt.values, names=cnt.index, color=cnt.index,
+                     color_discrete_map=DPE_COLORS,
+                     title="Repartition nationale des classes DPE", hole=0.35)
+        fig.update_traces(texttemplate="%{label}<br>%{percent:.1%}", textposition="inside")
+        st.plotly_chart(fig, use_container_width=True, key="t3_pie")
+    with c2:
+        bdf = df.dropna(subset=["conso_relle_kwh","etiquette_dpe"])
+        bdf = bdf[bdf["conso_relle_kwh"]<bdf["conso_relle_kwh"].quantile(0.99)]
+        fig = px.box(bdf, x="etiquette_dpe", y="conso_relle_kwh",
+                     color="etiquette_dpe", color_discrete_map=DPE_COLORS,
+                     category_orders={"etiquette_dpe":DPE_ORDER},
+                     title="Distribution conso reelle par classe",
+                     labels={"etiquette_dpe":"Classe","conso_relle_kwh":"kWh/an"},
+                     points="outliers")
+        fig.update_layout(showlegend=False)
+        st.plotly_chart(fig, use_container_width=True, key="t3_box")
+
+    c3,c4 = st.columns(2)
+    with c3:
+        nmc = med_by_dpe(df).reset_index()
+        fig = go.Figure()
+        fig.add_trace(go.Bar(name="DPE estime", x=nmc["etiquette_dpe"].astype(str),
+                             y=nmc["conso_dpe_kwh"], marker_color="#4C9BE8"))
+        fig.add_trace(go.Bar(name="Reel Enedis", x=nmc["etiquette_dpe"].astype(str),
+                             y=nmc["conso_relle_kwh"], marker_color="#F28E2B"))
+        fig.update_layout(barmode="group", title="DPE estime vs Reel — mediane nationale",
+                          xaxis_title="Classe", yaxis_title="kWh/an",
+                          legend=dict(orientation="h",y=-0.25))
+        st.plotly_chart(fig, use_container_width=True, key="t3_grp")
+        st.caption("Effet precarite : menages F/G sous-chauffes par contrainte budgetaire.")
+    with c4:
+        dpe_m  = df[df["etiquette_dpe"]==dpe_cur]["conso_relle_kwh"].median()
+        com_m2 = df[df["nom_commune_ban"]==commune]["conso_relle_kwh"].median()
+        near_m2 = nearest["conso_relle_kwh"].median() if not nearest.empty else np.nan
+        nat_m2  = df["conso_relle_kwh"].median()
+        cmp = pd.DataFrame({"Niveau":["France",commune,"10 proches",f"DPE {dpe_cur}"],
+                             "kWh/an":[nat_m2,com_m2,near_m2,dpe_m]}).dropna()
+        fig = px.bar(cmp, x="Niveau", y="kWh/an", color="Niveau",
+                     color_discrete_sequence=["#1f77b4","#2ca02c","#9467bd","#d62728"],
+                     title="Votre position relative", text="kWh/an")
+        fig.update_traces(texttemplate="%{text:.0f} kWh", textposition="outside")
+        fig.update_layout(showlegend=False)
+        st.plotly_chart(fig, use_container_width=True, key="t3_pos")
+
+    st.markdown("### Gains nationaux par amelioration DPE")
+    nat_cls = med_by_dpe(df)["conso_relle_kwh"]
+    gnat = []
+    for i in range(len(DPE_ORDER)-1):
+        fr, to = DPE_ORDER[i+1], DPE_ORDER[i]
+        if fr in nat_cls.index and to in nat_cls.index and nat_cls[fr]-nat_cls[to]>0:
+            g = nat_cls[fr]-nat_cls[to]
+            gnat.append({"Amelioration":f"{fr}→{to}","Gain (kWh/an)":f"{g:.0f}",
+                         "Gain (euros/an)":f"{g*prix_kwh:.0f}",
+                         "Gain 10 ans":f"{g*prix_kwh*10*(1+taux_hausse*5):.0f}"})
+    if gnat:
+        st.dataframe(pd.DataFrame(gnat), use_container_width=True, hide_index=True)
+
+    prd = (df.dropna(subset=["conso_relle_kwh","periode_construction"])
+             .groupby(["periode_construction","etiquette_dpe"],observed=True)
+             ["conso_relle_kwh"].median().reset_index())
+    p_order = ["Avant 1948","1948-1974","1975-1989","1990-2000",
+               "2001-2005","2006-2012","2013-2021","Apres 2021","Inconnue"]
+    fig = px.bar(prd[prd["periode_construction"].isin(p_order)],
+                 x="periode_construction", y="conso_relle_kwh",
+                 color="etiquette_dpe", color_discrete_map=DPE_COLORS,
+                 category_orders={"periode_construction":p_order},
+                 barmode="group", title="Conso reelle mediane par periode x classe DPE",
+                 labels={"conso_relle_kwh":"kWh/an","periode_construction":"Periode"})
+    fig.update_layout(height=370)
+    st.plotly_chart(fig, use_container_width=True, key="t3_prd")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -335,288 +798,124 @@ tab1, tab2, tab3, tab4 = st.tabs([
 with tab4:
     st.subheader("Prediction des couts electriques sur 10 ans")
 
-    # ── Estimation de la consommation actuelle ──
-    user_data2 = df[
-        (df["etiquette_dpe"] == dpe_actuel) &
-        df["surface_habitable_logement"].between(surface * 0.7, surface * 1.4)
-    ]["conso_relle_kwh"].dropna()
-    if user_data2.empty:
-        user_data2 = df[df["etiquette_dpe"] == dpe_actuel]["conso_relle_kwh"].dropna()
-    estimated_kwh = int(user_data2.median()) if not user_data2.empty else 4000
+    ud = df[(df["etiquette_dpe"]==dpe_cur) &
+            df["surface_habitable_logement"].between(surface*0.7,surface*1.4)
+            ]["conso_relle_kwh"].dropna()
+    if ud.empty:
+        ud = df[df["etiquette_dpe"]==dpe_cur]["conso_relle_kwh"].dropna()
+    est_kwh = int(ud.median()) if not ud.empty else 4000
 
-    # ── Paramètres communs aux deux modeles ──
-    col_params, col_right = st.columns([1, 3])
-    with col_params:
+    col_p, col_r = st.columns([1,3])
+    with col_p:
         st.markdown("#### Parametres")
-        custom_kwh = st.number_input(
-            "Conso annuelle actuelle (kWh)",
-            min_value=500, max_value=50000,
-            value=estimated_kwh, step=100,
-            help="Votre consommation reelle (ou estimee depuis le dataset Enedis).",
-        )
+        kwh = st.number_input("Conso annuelle actuelle (kWh)",
+                              min_value=500, max_value=50000,
+                              value=est_kwh, step=100)
         st.markdown(
-            f"**Profil**<br>"
-            f"Classe DPE : {dpe_badge(dpe_actuel)}<br>"
+            f"**Profil**<br>Classe DPE : {badge(dpe_cur)}<br>"
             f"Surface : **{surface} m2**<br>"
-            f"Conso : **{custom_kwh:,} kWh/an**<br>"
-            f"**Cout actuel : {custom_kwh * prix_kwh:.0f} euros/an**",
-            unsafe_allow_html=True,
-        )
-
-        # Potentiel 3CL affiché dans la sidebar du tab
-        DPE_KWH_M2 = {"A": 25.3, "B": 41.4, "C": 69.1, "D": 96.6, "E": 132.0, "F": 172.0, "G": 242.0}
-        cur_m2 = DPE_KWH_M2.get(dpe_actuel, 100.0)
-        ratio_a = DPE_KWH_M2["A"] / cur_m2
-        ratio_b = DPE_KWH_M2.get("B", cur_m2) / cur_m2
+            f"Conso : **{kwh:,} kWh/an**<br>"
+            f"**Cout actuel : {kwh*prix_kwh:.0f} euros/an**",
+            unsafe_allow_html=True)
         st.markdown("---")
+        cm  = DPE_KWH_M2.get(dpe_cur,100.0)
+        r_b = DPE_KWH_M2["B"]/cm
+        r_a = DPE_KWH_M2["A"]/cm
         st.markdown("**Potentiel technique (3CL)**")
-        if dpe_actuel not in ("A", "B"):
-            st.metric(
-                f"Apres renovation → B",
-                f"{custom_kwh * ratio_b:,.0f} kWh/an",
-                delta=f"-{(1 - ratio_b) * 100:.0f}% de conso",
-                delta_color="inverse",
-            )
-        if dpe_actuel != "A":
-            st.metric(
-                f"Apres renovation → A",
-                f"{custom_kwh * ratio_a:,.0f} kWh/an",
-                delta=f"-{(1 - ratio_a) * 100:.0f}% de conso",
-                delta_color="inverse",
-            )
+        if dpe_cur not in ("A","B"):
+            st.metric("Apres → B", f"{kwh*r_b:.0f} kWh/an",
+                      delta=f"-{(1-r_b)*100:.0f}%", delta_color="inverse")
+        if dpe_cur != "A":
+            st.metric("Apres → A", f"{kwh*r_a:.0f} kWh/an",
+                      delta=f"-{(1-r_a)*100:.0f}%", delta_color="inverse")
 
-    with col_right:
-        # ── Explication des deux approches ──
-        exp1, exp2 = st.columns(2)
-        with exp1:
-            st.info(
-                "**Modele Enedis** — Basé sur les consommations réelles mesurées "
-                "par les compteurs Linky. Intègre l'effet précarité (ménages F/G "
-                "sous-chauffés). Reflète ce qui se passe vraiment."
-            )
-        with exp2:
-            st.success(
-                "**Modele 3CL** — Basé sur le standard DPE officiel (kWh/m²/an). "
-                "Mesure le potentiel physique de la rénovation. "
-                "Donne les économies maximales atteignables."
-            )
+    with col_r:
+        ex1, ex2 = st.columns(2)
+        with ex1:
+            st.info("**Modele Enedis** — Consommations reelles Linky. "
+                    "Integre l'effet precarite. Reflète ce qui se passe vraiment.")
+        with ex2:
+            st.success("**Modele 3CL** — Standard DPE officiel (kWh/m2/an). "
+                       "Potentiel physique maximal de la renovation.")
 
     st.markdown("---")
 
-    # ══════════════════════════════
-    # MODELE 1 — ENEDIS (reel)
-    # ══════════════════════════════
+    # ── Calcul des deux modeles ──
+    yrs_e, sc_e = predict_enedis(kwh, prix_kwh, taux_hausse, dpe_cur)
+    yrs_3, sc_3 = predict_3cl(kwh, prix_kwh, taux_hausse, dpe_cur)
+
+    # ── MODELE ENEDIS ──
     st.markdown("### Modele Enedis — Consommations reelles Linky")
-
-    years, scenarios = predict_costs(custom_kwh, prix_kwh, taux_hausse, dpe_actuel)
-
-    col_e1, col_e2 = st.columns([3, 2])
-    with col_e1:
-        fig_pred_e = go.Figure()
-        for (name, costs), col_s in zip(scenarios.items(), ["#d62728", "#FFB432", "#2ca02c"]):
-            fig_pred_e.add_trace(go.Scatter(
-                x=years, y=[round(c) for c in costs],
-                mode="lines+markers", name=name,
-                line=dict(color=col_s, width=3), marker=dict(size=7),
-                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:.0f}} euros<extra></extra>",
-            ))
-        if len(scenarios) > 1:
-            fig_pred_e.add_vrect(
-                x0=2026.5, x1=2028.5, fillcolor="lightgreen", opacity=0.1,
-                annotation_text="Fenetre renovation", annotation_position="top left",
-            )
-        fig_pred_e.update_layout(
-            title=f"Enedis — DPE {dpe_actuel}, {surface} m2",
-            xaxis_title="Annee", yaxis_title="euros/an",
-            hovermode="x unified",
-            legend=dict(orientation="h", y=1.1, x=0),
-            height=360,
-        )
-        st.plotly_chart(fig_pred_e, use_container_width=True, key="chart_pred_enedis")
-
-    with col_e2:
-        # Economies cumulees Enedis
-        base_e = list(scenarios.values())[0]
-        total_e = sum(base_e)
+    ce1, ce2 = st.columns([3,2])
+    with ce1:
+        prediction_chart(yrs_e, sc_e, f"Enedis — DPE {dpe_cur}, {surface} m2", "t4_pred_e")
+    with ce2:
         st.markdown("**Economies cumulees (11 ans)**")
-        for name, costs in list(scenarios.items())[1:]:
-            saving = total_e - sum(costs)
-            st.metric(name.replace("Renovation -> ", "→ "),
-                      f"{sum(costs):.0f} euros",
-                      delta=f"-{saving:.0f} euros economies" if saving > 0 else "Reference",
-                      delta_color="inverse" if saving > 0 else "off")
-
-    # Tableau annuel Enedis
-    with st.expander("Voir le tableau annuel detaille — Modele Enedis"):
-        base_costs = list(scenarios.values())[0]
-        rows2 = []
-        for yr, base in zip(years, base_costs):
-            row2 = {"Annee": yr, list(scenarios.keys())[0]: f"{base:.0f}"}
-            for name, costs in list(scenarios.items())[1:]:
-                c2 = costs[years.index(yr)]
-                row2[name] = f"{c2:.0f}"
-                row2["Economie (euros)"] = f"{base - c2:.0f}"
-            rows2.append(row2)
-        st.dataframe(pd.DataFrame(rows2), use_container_width=True, hide_index=True)
-
-    if len(scenarios) > 1:
-        cum_rows = []
-        for name, costs in list(scenarios.items())[1:]:
-            cum = 0
-            for yr, (base, alt) in zip(years, zip(base_costs, costs)):
-                cum += base - alt
-                cum_rows.append({"Annee": yr, "Scenario": name, "Economie cumulee (euros)": round(cum)})
-        fig_cum_e = px.area(
-            pd.DataFrame(cum_rows), x="Annee", y="Economie cumulee (euros)", color="Scenario",
-            color_discrete_sequence=["#FFB432", "#2ca02c"],
-            title="Economies cumulees — Modele Enedis",
-            markers=True,
-        )
-        fig_cum_e.update_layout(height=260, hovermode="x unified")
-        st.plotly_chart(fig_cum_e, use_container_width=True, key="chart_cum_enedis")
+        savings_metrics(sc_e)
+    with st.expander("Tableau annuel — Modele Enedis"):
+        annual_table(yrs_e, sc_e, "enedis")
+    cumul_chart(yrs_e, sc_e, "Economies cumulees — Modele Enedis", "t4_cum_e")
 
     st.markdown("---")
 
-    # ══════════════════════════════
-    # MODELE 2 — 3CL (potentiel technique)
-    # ══════════════════════════════
+    # ── MODELE 3CL ──
     st.markdown("### Modele 3CL — Potentiel technique de renovation")
-    st.caption(
-        "Les ratios sont calcules depuis les kWh/m2/an de la methode officielle de calcul thermique DPE 3CL. "
-        "Ils representent le potentiel maximal atteignable independamment des comportements."
-    )
-
-    years3, scenarios3 = predict_costs_3cl(custom_kwh, prix_kwh, taux_hausse, dpe_actuel)
-
-    col_3a, col_3b = st.columns([3, 2])
-    with col_3a:
-        fig_pred_3cl = go.Figure()
-        for (name, costs), col_s in zip(scenarios3.items(), ["#d62728", "#FFB432", "#2ca02c"]):
-            fig_pred_3cl.add_trace(go.Scatter(
-                x=years3, y=[round(c) for c in costs],
-                mode="lines+markers", name=name,
-                line=dict(color=col_s, width=3), marker=dict(size=7),
-                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:.0f}} euros<extra></extra>",
-            ))
-        if len(scenarios3) > 1:
-            fig_pred_3cl.add_vrect(
-                x0=2026.5, x1=2028.5, fillcolor="lightgreen", opacity=0.1,
-                annotation_text="Fenetre renovation", annotation_position="top left",
-            )
-        fig_pred_3cl.update_layout(
-            title=f"3CL — DPE {dpe_actuel}, {surface} m2",
-            xaxis_title="Annee", yaxis_title="euros/an",
-            hovermode="x unified",
-            legend=dict(orientation="h", y=1.1, x=0),
-            height=360,
-        )
-        st.plotly_chart(fig_pred_3cl, use_container_width=True, key="chart_pred_3cl")
-
-    with col_3b:
-        base3 = list(scenarios3.values())[0]
-        total3 = sum(base3)
+    st.caption("Ratios calcules depuis les kWh/m2/an de la methode officielle DPE 3CL. "
+               "Representent le potentiel maximal atteignable independamment des comportements.")
+    c3a, c3b = st.columns([3,2])
+    with c3a:
+        prediction_chart(yrs_3, sc_3, f"3CL — DPE {dpe_cur}, {surface} m2", "t4_pred_3")
+    with c3b:
         st.markdown("**Economies cumulees (11 ans)**")
-        for name, costs in list(scenarios3.items())[1:]:
-            saving3 = total3 - sum(costs)
-            st.metric(
-                name.replace("Renovation -> ", "→ "),
-                f"{sum(costs):.0f} euros",
-                delta=f"-{saving3:.0f} euros economies" if saving3 > 0 else "Reference",
-                delta_color="inverse" if saving3 > 0 else "off",
-            )
-
-    # Tableau annuel 3CL
-    with st.expander("Voir le tableau annuel detaille — Modele 3CL"):
-        rows3 = []
-        for yr, base in zip(years3, base3):
-            row3 = {"Annee": yr, list(scenarios3.keys())[0]: f"{base:.0f} euros"}
-            for name, costs in list(scenarios3.items())[1:]:
-                c3_ = costs[years3.index(yr)]
-                row3[name] = f"{c3_:.0f} euros"
-                row3["Economie (euros)"] = f"{base - c3_:.0f}"
-            rows3.append(row3)
-        st.dataframe(pd.DataFrame(rows3), use_container_width=True, hide_index=True)
-
-    if len(scenarios3) > 1:
-        cum_rows3 = []
-        for name, costs in list(scenarios3.items())[1:]:
-            cum3 = 0
-            for yr, (base, alt) in zip(years3, zip(base3, costs)):
-                cum3 += base - alt
-                cum_rows3.append({"Annee": yr, "Scenario": name, "Economie cumulee (euros)": round(cum3)})
-        fig_cum_3cl = px.area(
-            pd.DataFrame(cum_rows3), x="Annee", y="Economie cumulee (euros)", color="Scenario",
-            color_discrete_sequence=["#FFB432", "#2ca02c"],
-            title="Economies cumulees — Modele 3CL",
-            markers=True,
-        )
-        fig_cum_3cl.update_layout(height=260, hovermode="x unified")
-        st.plotly_chart(fig_cum_3cl, use_container_width=True, key="chart_cum_3cl")
+        savings_metrics(sc_3)
+    with st.expander("Tableau annuel — Modele 3CL"):
+        annual_table(yrs_3, sc_3, "3cl")
+    cumul_chart(yrs_3, sc_3, "Economies cumulees — Modele 3CL", "t4_cum_3")
 
     st.markdown("---")
 
-    # ══════════════════════════════
-    # COMPARAISON ENEDIS vs 3CL
-    # ══════════════════════════════
+    # ── COMPARAISON ENEDIS vs 3CL ──
     st.markdown("### Comparaison Enedis vs 3CL — Economies totales sur 11 ans")
-
+    base_e_tot = sum(list(sc_e.values())[0])
+    base_3_tot = sum(list(sc_3.values())[0])
     cmp_rows = []
-    for (name_e, costs_e), (name_3, costs_3) in zip(
-        list(scenarios.items())[1:], list(scenarios3.items())[1:]
-    ):
-        eco_e = sum(base_costs) - sum(costs_e)
-        eco_3 = sum(base3) - sum(costs_3)
-        label = name_e.replace("Renovation -> ", "")
-        cmp_rows.append({
-            "Scenario": label,
-            "Enedis — reel (euros)": round(eco_e),
-            "3CL — potentiel max (euros)": round(eco_3),
-            "Ecart (euros)": round(eco_3 - eco_e),
-        })
-
+    for (ne, ce), (n3, c3) in zip(list(sc_e.items())[1:], list(sc_3.items())[1:]):
+        eco_e = base_e_tot - sum(ce)
+        eco_3 = base_3_tot - sum(c3)
+        lbl   = ne.replace("Renovation → ","")
+        cmp_rows.append({"Scenario":lbl,
+                         "Enedis — reel (euros)":round(eco_e),
+                         "3CL — potentiel max (euros)":round(eco_3),
+                         "Ecart (euros)":round(eco_3-eco_e)})
     if cmp_rows:
         cdf = pd.DataFrame(cmp_rows)
         st.dataframe(cdf, use_container_width=True, hide_index=True)
+        fig = go.Figure()
+        for col_name, col_color in [("Enedis — reel (euros)","#F28E2B"),
+                                     ("3CL — potentiel max (euros)","#2ca02c")]:
+            fig.add_trace(go.Bar(name=col_name, x=cdf["Scenario"], y=cdf[col_name],
+                                 marker_color=col_color,
+                                 text=cdf[col_name].apply(lambda v: f"{v:.0f} euros"),
+                                 textposition="outside"))
+        fig.update_layout(barmode="group",
+                          title="Economies totales : Modele Enedis vs Modele 3CL",
+                          yaxis_title="Economies (euros)",
+                          legend=dict(orientation="h",y=-0.25), height=380)
+        st.plotly_chart(fig, use_container_width=True, key="t4_cmp_both")
+        st.caption("Le modele Enedis reflète les comportements reels. "
+                   "Le modele 3CL indique le potentiel maximal. "
+                   "La verite se situe entre les deux.")
 
-        fig_cmp_both = go.Figure()
-        colors_both = {"Enedis — reel (euros)": "#F28E2B", "3CL — potentiel max (euros)": "#2ca02c"}
-        for col_name, bar_color in colors_both.items():
-            fig_cmp_both.add_trace(go.Bar(
-                name=col_name,
-                x=cdf["Scenario"],
-                y=cdf[col_name],
-                marker_color=bar_color,
-                text=cdf[col_name].apply(lambda v: f"{v:.0f} euros"),
-                textposition="outside",
-            ))
-        fig_cmp_both.update_layout(
-            barmode="group",
-            title="Economies totales sur 11 ans : Modele Enedis vs Modele 3CL",
-            yaxis_title="Economies cumulees (euros)",
-            legend=dict(orientation="h", y=-0.25),
-            height=380,
-        )
-        st.plotly_chart(fig_cmp_both, use_container_width=True, key="chart_cmp_both")
-        st.caption(
-            "Le modele Enedis reflète les comportements reels (avec effet precarite energetique). "
-            "Le modele 3CL indique le potentiel maximal atteignable par la renovation thermique. "
-            "La verite se situe generalement entre les deux."
-        )
-
-        # Tableau kWh/m2 par classe
         st.markdown("**Reference — kWh/m2/an par classe DPE (standard 3CL)**")
-        ref_df = pd.DataFrame([
-            {"Classe": cls, "kWh/m2/an (3CL)": v,
-             "Reduction vs G": f"{(1 - v/242)*100:.0f}%",
-             "Ratio vs classe actuelle": f"{v/cur_m2:.2f}"}
-            for cls, v in DPE_KWH_M2.items()
-        ])
-        st.dataframe(ref_df, use_container_width=True, hide_index=True)
+        cm_cur = DPE_KWH_M2.get(dpe_cur, 100.0)
+        ref = pd.DataFrame([{"Classe":cls,
+                              "kWh/m2/an (3CL)":v,
+                              "Reduction vs G":f"{(1-v/242)*100:.0f}%",
+                              "Ratio vs classe actuelle":f"{v/cm_cur:.2f}"}
+                             for cls,v in DPE_KWH_M2.items()])
+        st.dataframe(ref, use_container_width=True, hide_index=True)
 
-
+# ─────────────────────────────────────────────────────────────
 st.markdown("---")
-st.caption(
-    "Sources : ADEME (DPE logements existants post-2021) x Enedis (conso residentielle par adresse). "
-    "Geocodage via API BAN — adresse.data.gouv.fr. "
-    "Predictions basees sur des hypotheses tarifaires simplifiees."
-)
+st.caption("Sources : ADEME (DPE post-2021) x Enedis (conso residentielle). "
+           "Geocodage : API BAN — adresse.data.gouv.fr.")

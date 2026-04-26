@@ -222,7 +222,8 @@ with st.sidebar:
     except Exception:
         pass
 
-    st.markdown("## Votre adresse")
+    st.markdown("## 📍 Votre adresse")
+    st.caption("Entrez votre adresse pour localiser les logements similaires les plus proches.")
     addr_input = st.text_input("Adresse complete",
                                placeholder="Ex: 12 rue Jean Jaures, Orleans",
                                help="Geocodage via l'API BAN (adresse.data.gouv.fr).")
@@ -244,7 +245,8 @@ with st.sidebar:
         st.caption(f"Confiance : {int(st.session_state.get('geo_score',0)*100)}%")
 
     st.markdown("---")
-    st.markdown("## Votre logement")
+    st.markdown("## 🏠 Votre logement")
+    st.caption("Ces informations personnalisent l'analyse et la prediction.")
 
     geo_city  = st.session_state.get("geo_city","")
     matched   = next((c for c in communes_list if geo_city.lower() in c.lower()), None) if geo_city else None
@@ -264,7 +266,8 @@ with st.sidebar:
     st.markdown(f"Classe : {badge(dpe_cur)}", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("### Hypotheses tarifaires")
+    st.markdown("### 💶 Hypotheses tarifaires")
+    st.caption("Ces valeurs servent a convertir les kWh en euros dans les previsions.")
     prix_kwh    = st.number_input("Prix (euros/kWh)", 0.10, 1.0, ELECTRICITY_PRICE, 0.01)
     taux_hausse = st.slider("Hausse annuelle (%)", 0, 10, DEFAULT_INCREASE) / 100
     st.caption(f"Base : {len(df):,} logements · {len(communes_list)} communes")
@@ -273,14 +276,14 @@ with st.sidebar:
 # HEADER
 # ─────────────────────────────────────────────────────────────
 st.title("DPE & Consommation Electrique — Analyse & Prediction")
-st.caption("Donnees ADEME (DPE) x Enedis (consommations reelles Linky).")
+st.caption("Comparez votre consommation electrique avec vos voisins et estimez les economies d'une renovation energetique. Donnees ADEME (DPE) x Enedis.")
 st.markdown("---")
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "🗺️ Logements proches",
-    "🏘️ Analyse commune",
-    "🇫🇷 Analyse France",
-    "📈 Prediction 10 ans",
+    "🏘️ Ma commune",
+    "🇫🇷 Benchmark France",
+    "📈 Prevision de mes couts",
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -307,7 +310,7 @@ with tab1:
         st.stop()
 
     # ── KPIs ──
-    st.markdown("### Vue d'ensemble des 10 logements")
+    st.markdown("### 🏠 Vue d'ensemble des 10 logements les plus proches de votre adresse")
     pct_pass  = nearest["etiquette_dpe"].isin(["F","G"]).mean()*100
     dist_max  = nearest["distance_m"].max()
     med_reel  = nearest["conso_relle_kwh"].median()
@@ -324,7 +327,7 @@ with tab1:
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── CARTE ──
-    st.markdown("### Carte interactive")
+    st.markdown("### 🗺️ Carte — Cliquez sur un logement pour voir ses details")
     m = folium.Map(location=[(nearest["lat"].mean()+u_lat)/2,
                               (nearest["lon"].mean()+u_lon)/2],
                    zoom_start=14, tiles="CartoDB positron")
@@ -386,7 +389,8 @@ with tab1:
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── CONSOMMATIONS ──
-    st.markdown("### Analyse des consommations")
+    st.markdown("### ⚡ Consommations : estimees (DPE) vs mesurees (Enedis)")
+    st.caption("Le DPE estime la consommation theorique. Enedis mesure la consommation reelle. L'ecart revele le comportement reel des occupants.")
     c1, c2 = st.columns(2)
     with c1:
         nb = nearest.sort_values("distance_m").copy()
@@ -414,13 +418,14 @@ with tab1:
         fig2.add_hline(y=0, line_dash="dash", line_color="grey")
         fig2.update_layout(title="Ecart reel vs DPE (%)",
                            xaxis_title="Logement", yaxis_title="%", height=360)
-        st.caption("Rouge = reel > DPE | Vert = reel < DPE")
+        st.caption("🔴 Rouge : la consommation reelle depasse l'estimation du DPE (souvent logements bien chauffes). 🟢 Vert : la conso reelle est inferieure (souvent logements sous-chauffes par contrainte budgetaire).")
         st.plotly_chart(fig2, use_container_width=True, key="t1_ecart")
 
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── USAGES ──
-    st.markdown("### Detail par usage (DPE estime)")
+    st.markdown("### 🔍 A quoi sert l'energie dans ces logements ?")
+    st.caption("Repartition estimee par usage : chauffage, eau chaude, eclairage, etc.")
     c3, c4 = st.columns(2)
     with c3:
         urows = []
@@ -451,7 +456,8 @@ with tab1:
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── THERMIQUE ──
-    st.markdown("### Deperditions thermiques & isolation")
+    st.markdown("### 🏚️ Qualite de l'isolation — Ou part la chaleur ?")
+    st.caption("Les deperditions (W/K) mesurent la quantite de chaleur perdue. Plus c'est eleve, plus le logement est mal isole et consomme beaucoup.")
     c5, c6 = st.columns(2)
     with c5:
         drows = []
@@ -490,7 +496,7 @@ with tab1:
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── TABLEAU COMPLET ──
-    st.markdown("### Tableau recapitulatif complet")
+    st.markdown("### 📋 Tableau comparatif complet des 10 logements")
     rcols = {"distance_m":"Dist.(m)","etiquette_dpe":"DPE","score_dpe":"Score",
              "type_batiment":"Type","surface_habitable_logement":"Surface(m2)",
              "periode_construction":"Periode","qualite_isolation_enveloppe":"Iso.env",
@@ -514,8 +520,8 @@ with tab1:
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── FICHES INDIVIDUELLES ──
-    st.markdown("### Fiches individuelles")
-    st.caption("Cliquez pour developper la fiche complete.")
+    st.markdown("### 📁 Fiches detaillees — Cliquez sur un logement pour tout savoir")
+    st.caption("Chaque fiche contient : caracteristiques du batiment, detail des consommations par usage, qualite d'isolation et score DPE.")
     for rank, (_, row) in enumerate(nearest.iterrows(), 1):
         dpe  = str(row.get("etiquette_dpe","?"))
         surf = row.get("surface_habitable_logement",0)
@@ -590,7 +596,8 @@ with tab1:
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── POSITIONNEMENT ──
-    st.markdown("### Positionnement vs commune et France")
+    st.markdown("### 📊 Ou se situent ces logements par rapport a la France ?")
+    st.caption("Comparez la consommation de vos 10 logements proches avec la moyenne de votre commune et la moyenne nationale.")
     c9, c10 = st.columns(2)
     with c9:
         nat_m  = df["conso_relle_kwh"].median()
@@ -695,7 +702,8 @@ with tab2:
                 fig.update_coloraxes(showscale=False)
                 st.plotly_chart(fig, use_container_width=True, key="t2_gains")
 
-        st.markdown("### Recapitulatif par classe DPE")
+        st.markdown("### 📋 Recapitulatif par classe DPE")
+        st.caption("Comparaison de la consommation estimee (DPE) et reelle (Enedis) pour chaque classe, ainsi que le cout annuel moyen.")
         tbl = med_by_dpe(com_df).reset_index()
         tbl["Cout median (euros/an)"] = (tbl["conso_relle_kwh"]*prix_kwh).round(0).astype("Int64")
         tbl.columns = ["Classe DPE","Conso DPE (kWh)","Conso reelle (kWh)","Nb log","Cout (euros/an)"]
@@ -749,7 +757,7 @@ with tab3:
                           xaxis_title="Classe", yaxis_title="kWh/an",
                           legend=dict(orientation="h",y=-0.25))
         st.plotly_chart(fig, use_container_width=True, key="t3_grp")
-        st.caption("Effet precarite : menages F/G sous-chauffes par contrainte budgetaire.")
+        st.caption("⚠️ Attention : les logements F et G consomment parfois MOINS que les D et E en reel. Ce phenomene, appele effet precarite, s'explique par le fait que les menages aux revenus modestes reduisent leur chauffage pour limiter leurs factures.")
     with c4:
         dpe_m  = df[df["etiquette_dpe"]==dpe_cur]["conso_relle_kwh"].median()
         com_m2 = df[df["nom_commune_ban"]==commune]["conso_relle_kwh"].median()
@@ -764,7 +772,8 @@ with tab3:
         fig.update_layout(showlegend=False)
         st.plotly_chart(fig, use_container_width=True, key="t3_pos")
 
-    st.markdown("### Gains nationaux par amelioration DPE")
+    st.markdown("### 💰 Combien peut-on economiser en ameliorant son DPE ?")
+    st.caption("Ces gains sont calcules sur les consommations reelles mesurees par Enedis, en prenant la difference de consommation mediane entre chaque classe.")
     nat_cls = med_by_dpe(df)["conso_relle_kwh"]
     gnat = []
     for i in range(len(DPE_ORDER)-1):
@@ -819,7 +828,7 @@ with tab4:
             f"**Cout actuel : {kwh*prix_kwh:.0f} euros/an**",
             unsafe_allow_html=True)
     with pa2:
-        st.markdown("#### Potentiel technique (3CL)")
+        st.markdown("#### 🎯 Economies si renovation")
         cm  = DPE_KWH_M2.get(dpe_cur,100.0)
         r_b = DPE_KWH_M2["B"]/cm
         r_a = DPE_KWH_M2["A"]/cm
@@ -830,7 +839,7 @@ with tab4:
             st.metric("Apres renovation → A", f"{kwh*r_a:.0f} kWh/an",
                       delta=f"-{(1-r_a)*100:.0f}% de conso", delta_color="inverse")
     with pa3:
-        st.markdown("#### Methodologie")
+        st.markdown("#### ❓ Comment sont calculees les previsions ?")
         st.info("**Modele Enedis** — Consommations reelles mesurées par les compteurs Linky. "
                 "Integre l'effet precarite energetique. Reflète ce qui se passe vraiment.")
         st.success("**Modele 3CL** — Standard DPE officiel (kWh/m2/an). "
@@ -843,37 +852,38 @@ with tab4:
     yrs_3, sc_3 = predict_3cl(kwh, prix_kwh, taux_hausse, dpe_cur)
 
     # ── MODELE ENEDIS ──
-    st.markdown("### Modele Enedis — Consommations reelles Linky")
+    st.markdown("### 📊 Modele 1 : base sur ce que consomment vraiment les gens")
+    st.caption("Ce modele calcule vos economies futures d'apres les consommations reellement mesurees par les compteurs Linky dans des logements similaires au votre.")
     ce1, ce2 = st.columns([3,2])
     with ce1:
         prediction_chart(yrs_e, sc_e, f"Enedis — DPE {dpe_cur}, {surface} m2", "t4_pred_e")
     with ce2:
         st.markdown("**Economies cumulees (11 ans)**")
         savings_metrics(sc_e)
-    with st.expander("Tableau annuel — Modele Enedis"):
+    with st.expander("📅 Tableau des couts annuels — Modele Enedis", expanded=True):
         annual_table(yrs_e, sc_e, "enedis")
     cumul_chart(yrs_e, sc_e, "Economies cumulees — Modele Enedis", "t4_cum_e")
 
     st.markdown("---")
 
     # ── MODELE 3CL ──
-    st.markdown("### Modele 3CL — Potentiel technique de renovation")
-    st.caption("Ratios calcules depuis les kWh/m2/an de la methode officielle DPE 3CL. "
-               "Representent le potentiel maximal atteignable independamment des comportements.")
+    st.markdown("### 🔬 Modele 2 : base sur le potentiel technique de la renovation")
+    st.caption("Ce modele calcule les economies que permettrait physiquement la renovation : si vous passez de DPE D a DPE A, votre logement consomme theoriquement 74% de moins. C'est le potentiel maximal atteignable.")
     c3a, c3b = st.columns([3,2])
     with c3a:
         prediction_chart(yrs_3, sc_3, f"3CL — DPE {dpe_cur}, {surface} m2", "t4_pred_3")
     with c3b:
         st.markdown("**Economies cumulees (11 ans)**")
         savings_metrics(sc_3)
-    with st.expander("Tableau annuel — Modele 3CL"):
+    with st.expander("📅 Tableau des couts annuels — Modele 3CL", expanded=True):
         annual_table(yrs_3, sc_3, "3cl")
     cumul_chart(yrs_3, sc_3, "Economies cumulees — Modele 3CL", "t4_cum_3")
 
     st.markdown("---")
 
     # ── COMPARAISON ENEDIS vs 3CL ──
-    st.markdown("### Comparaison Enedis vs 3CL — Economies totales sur 11 ans")
+    st.markdown("### ⚖️ Comparaison des deux modeles — Economies totales sur 11 ans")
+    st.caption("La verite se situe entre les deux modeles : le modele Enedis sous-evalue parfois les economies (effet precarite), le modele 3CL les sur-evalue (comportement ideal).")
     base_e_tot = sum(list(sc_e.values())[0])
     base_3_tot = sum(list(sc_3.values())[0])
     cmp_rows = []
@@ -900,11 +910,10 @@ with tab4:
                           yaxis_title="Economies (euros)",
                           legend=dict(orientation="h",y=-0.25), height=380)
         st.plotly_chart(fig, use_container_width=True, key="t4_cmp_both")
-        st.caption("Le modele Enedis reflète les comportements reels. "
-                   "Le modele 3CL indique le potentiel maximal. "
-                   "La verite se situe entre les deux.")
 
-        st.markdown("**Reference — kWh/m2/an par classe DPE (standard 3CL)**")
+
+        st.markdown("**📖 Reference : consommation standard par classe DPE (methode officielle 3CL)**")
+        st.caption("Par exemple, un logement classe A consomme en moyenne 25 kWh par m2 et par an, contre 242 kWh pour un logement classe G — soit 10 fois plus !")
         cm_cur = DPE_KWH_M2.get(dpe_cur, 100.0)
         ref = pd.DataFrame([{"Classe":cls,
                               "kWh/m2/an (3CL)":v,

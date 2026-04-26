@@ -1014,9 +1014,10 @@ with tab5:
     st.markdown("**Tableau de synthese : DPE estime vs reel et variabilite**")
     tbl_var = stats_var.copy().reset_index()
     tbl_var.columns = ["Classe DPE","Mediane reelle (kWh)","Ecart-type (kWh)",
-                        "Mediane DPE (kWh)","Ecart DPE-reel (kWh)","Ecart (%)","Variabilite (CV%)"]
+                        "Mediane DPE (kWh)","Nb logements",
+                        "Ecart DPE-reel (kWh)","Ecart (%)","Variabilite (CV%)"]
     for c_ in ["Mediane reelle (kWh)","Ecart-type (kWh)","Mediane DPE (kWh)",
-                "Ecart DPE-reel (kWh)"]:
+                "Ecart DPE-reel (kWh)","Nb logements"]:
         tbl_var[c_] = tbl_var[c_].round(0).astype("Int64")
     for c_ in ["Ecart (%)","Variabilite (CV%)"]:
         tbl_var[c_] = tbl_var[c_].round(1)

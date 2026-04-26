@@ -297,7 +297,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 # EN-TÊTE
 # ─────────────────────────────────────────────────────────────
-st.title("DPE & Consommation Électrique — Analyse & Prévision")
+st.title("Diagnostics de Performance Énergétique")
 st.caption(
     "Comparez votre consommation électrique avec vos voisins et estimez les économies "
     "d'une rénovation énergétique. Données ADEME × Enedis."

@@ -17,6 +17,16 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
+def fmt(n, unit=""):
+    """Format number with space as thousands separator (French style)."""
+    try:
+        s = f"{int(round(n)):,}".replace(",", " ")
+        return f"{s} {unit}".strip() if unit else s
+    except Exception:
+        return str(n)
+
+
+
 # ─────────────────────────────────────────────────────────────
 # CONFIGURATION
 # ─────────────────────────────────────────────────────────────
@@ -266,7 +276,25 @@ with st.sidebar:
     default_idx   = communes_list.index(matched) if matched else (
         communes_list.index("Orleans") if "Orleans" in communes_list else 0
     )
-    commune       = st.selectbox("Commune (onglets 2-3)", communes_list, index=default_idx)
+    commune = st.selectbox(
+        "Commune (onglets 2-3)",
+        communes_list,
+        index=default_idx,
+        help=(
+            "Le dataset couvre ~400 communes. "
+            "Les grandes villes (Paris, Lyon, Marseille, Nice, Strasbourg...) "
+            "ne sont pas disponibles car Enedis n y publie pas de donnees "
+            "a la maille adresse (moins de 10 logements par adresse)."
+        ),
+    )
+    # Avertissement si commune tapee mais non trouvee
+    if default_city and not matched:
+        st.warning(
+            f"**{default_city}** n est pas dans le dataset Enedis. "
+            "Les grandes metropoles (Nice, Paris, Lyon, Marseille...) sont absentes "
+            "car les donnees Enedis ne sont publiees que pour les adresses "
+            "avec au moins 10 logements. La commune la plus proche est selectionnee."
+        )
     type_batiment = st.selectbox("Type de batiment", ["appartement","maison","immeuble"])
     surface       = st.slider("Surface habitable (m2)", 15, 300, 65, step=5)
     dpe_actuel    = st.select_slider("Classe DPE actuelle", options=DPE_ORDER, value="D")
@@ -353,7 +381,7 @@ with tab1:
     k2.metric("DPE dominant",         dpe_dom)
     k3.metric("Conso reelle mediane", f"{conso_med_r:,.0f} kWh")
     k4.metric("Conso DPE mediane",    f"{conso_med_d:,.0f} kWh", f"{ecart_pct:+.1f}% vs DPE")
-    k5.metric("Cout annuel median",   f"{cout_med:,.0f} euros")
+    k5.metric("Cout annuel median",   f"{cout_med:.0f} euros")
     k6.metric("Passoires (F+G)",      f"{pct_pass:.0f}%")
 
     st.markdown('<hr style="border-top:2px solid #eee;margin:14px 0">', unsafe_allow_html=True)
@@ -425,7 +453,7 @@ with tab1:
           <b>Consommation reelle Enedis</b><br>
           &nbsp; <b>{rkwh:,.0f} kWh/an</b>
           (<span style='color:{"#c0392b" if ecrt>0 else "#27ae60"}'>{ecrt:+.1f}% vs DPE</span>)<br>
-          &nbsp; Cout estime : <b>{cout:,.0f} euros/an</b><br>
+          &nbsp; Cout estime : <b>{cout:.0f} euros/an</b><br>
           <hr style='margin:5px 0'>
           <b>Thermique</b><br>
           &nbsp; Deperditions enveloppe : {row.get("deperditions_enveloppe",0):,.0f} W/K<br>
@@ -777,7 +805,7 @@ with tab1:
 | DPE par m2 | {row.get("conso_5_usages_par_m2_ef",0):.0f} kWh/m2 | |
 | **Reel Enedis** | **{rkwh:,.0f}** | |
 | Ecart reel/DPE | {ecrt:+.1f}% | |
-| **Cout annuel** | **{cout:,.0f} euros/an** | |
+| **Cout annuel** | **{cout:.0f} euros/an** | |
 """)
 
                 # Mini pie usage
@@ -1048,7 +1076,7 @@ with tab3:
                 gains_nat.append({
                     "Amelioration":f"{frm}→{to_}",
                     "Gain (kWh/an)":f"{g:,.0f}",
-                    "Gain (euros/an)":f"{g*prix_kwh:,.0f}",
+                    "Gain (euros/an)":f"{g*prix_kwh:.0f}",
                     "Gain sur 10 ans":f"{g*prix_kwh*10*(1+taux_hausse*5):,.0f}",
                 })
     if gains_nat:
@@ -1093,7 +1121,7 @@ with tab4:
             f"Classe DPE : {dpe_badge(dpe_actuel)}<br>"
             f"Surface : **{surface} m2**<br>"
             f"Conso : **{custom_kwh:,} kWh/an**<br>"
-            f"**Cout 2024 : {custom_kwh*prix_kwh:,.0f} euros/an**",
+            f"**Cout 2024 : {custom_kwh*prix_kwh:.0f} euros/an**",
             unsafe_allow_html=True,
         )
 
@@ -1105,7 +1133,7 @@ with tab4:
                 x=years, y=[round(c) for c in costs],
                 mode="lines+markers", name=name,
                 line=dict(color=col_s,width=3), marker=dict(size=7),
-                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:,.0f}} euros<extra></extra>",
+                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:.0f}} euros<extra></extra>",
             ))
         if len(scenarios)>1:
             fig_pred2.add_vrect(x0=2026.5,x1=2028.5,fillcolor="lightgreen",opacity=0.1,
@@ -1124,7 +1152,7 @@ with tab4:
         for name,costs in list(scenarios.items())[1:]:
             c2 = costs[years.index(yr)]
             row2[name] = f"{c2:,.0f}"
-            row2["Economie vs sans renov. (euros)"] = f"{base-c2:,.0f}"
+            row2["Economie vs sans renov. (euros)"] = f"{base-c2:.0f}"
         rows2.append(row2)
     st.dataframe(pd.DataFrame(rows2), use_container_width=True, hide_index=True)
 
@@ -1134,8 +1162,8 @@ with tab4:
     for i,(name,costs) in enumerate(scenarios.items()):
         saving = total_base-sum(costs)
         with ecols2[i]:
-            st.metric(name, f"{sum(costs):,.0f} euros cumules",
-                      delta=f"-{saving:,.0f} euros" if saving>0 else "Reference",
+            st.metric(name, f"{sum(costs):.0f} euros cumules",
+                      delta=f"-{saving:.0f} euros" if saving>0 else "Reference",
                       delta_color="inverse" if saving>0 else "off")
 
     if len(scenarios)>1:
@@ -1233,7 +1261,7 @@ with tab5:
             f"Classe DPE : {dpe_badge(dpe_actuel)}<br>"
             f"Surface : **{surface} m2**<br>"
             f"Conso actuelle : **{custom_kwh3:,} kWh/an**<br>"
-            f"Cout actuel : **{custom_kwh3*prix_kwh:,.0f} euros/an**",
+            f"Cout actuel : **{custom_kwh3*prix_kwh:.0f} euros/an**",
             unsafe_allow_html=True,
         )
         st.markdown("---")
@@ -1242,12 +1270,12 @@ with tab5:
             st.metric(f"Apres renovation classe B", f"{nk_b:,.0f} kWh/an",
                       delta=f"-{custom_kwh3-nk_b:,.0f} kWh/an ({(1-ratio_b)*100:.0f}%)",
                       delta_color="inverse")
-            st.metric(f"Economie annuelle → B", f"{eco_b_yr:,.0f} euros/an", delta_color="off")
+            st.metric(f"Economie annuelle → B", f"{eco_b_yr:.0f} euros/an", delta_color="off")
         if dpe_actuel != "A":
             st.metric(f"Apres renovation classe A", f"{nk_a:,.0f} kWh/an",
                       delta=f"-{custom_kwh3-nk_a:,.0f} kWh/an ({(1-ratio_a)*100:.0f}%)",
                       delta_color="inverse")
-            st.metric(f"Economie annuelle → A", f"{eco_a_yr:,.0f} euros/an", delta_color="off")
+            st.metric(f"Economie annuelle → A", f"{eco_a_yr:.0f} euros/an", delta_color="off")
 
     with col_c3:
         years3, scenarios3 = predict_costs_3cl(custom_kwh3, prix_kwh, taux_hausse, dpe_actuel)
@@ -1258,7 +1286,7 @@ with tab5:
                 x=years3, y=[round(c) for c in costs],
                 mode="lines+markers", name=name,
                 line=dict(color=col_s, width=3), marker=dict(size=7),
-                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:,.0f}} euros<extra></extra>",
+                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:.0f}} euros<extra></extra>",
             ))
         if len(scenarios3) > 1:
             fig_pred3.add_vrect(
@@ -1279,11 +1307,11 @@ with tab5:
     base3 = list(scenarios3.values())[0]
     rows3 = []
     for yr, base in zip(years3, base3):
-        row3 = {"Annee": yr, list(scenarios3.keys())[0]: f"{base:,.0f} euros"}
+        row3 = {"Annee": yr, list(scenarios3.keys())[0]: f"{base:.0f} euros"}
         for name, costs in list(scenarios3.items())[1:]:
             c3_ = costs[years3.index(yr)]
-            row3[name] = f"{c3_:,.0f} euros"
-            row3["Economie vs sans renov."] = f"{base - c3_:,.0f} euros"
+            row3[name] = f"{c3_:.0f} euros"
+            row3["Economie vs sans renov."] = f"{base - c3_:.0f} euros"
         rows3.append(row3)
     st.dataframe(pd.DataFrame(rows3), use_container_width=True, hide_index=True)
 
@@ -1296,8 +1324,8 @@ with tab5:
         with ecols3[i3]:
             st.metric(
                 name,
-                f"{sum(costs):,.0f} euros cumules",
-                delta=f"-{saving3:,.0f} euros" if saving3 > 0 else "Reference",
+                f"{sum(costs):.0f} euros cumules",
+                delta=f"-{saving3:.0f} euros" if saving3 > 0 else "Reference",
                 delta_color="inverse" if saving3 > 0 else "off",
             )
 
@@ -1336,9 +1364,9 @@ with tab5:
         scenario_label = name_e.replace("Renovation -> ", "")
         cmp_rows.append({
             "Scenario": scenario_label,
-            "Economie Enedis (reel)": f"{eco_e:,.0f} euros",
-            "Economie 3CL (potentiel technique)": f"{eco_3:,.0f} euros",
-            "Ecart": f"{eco_3 - eco_e:,.0f} euros",
+            "Economie Enedis (reel)": f"{eco_e:.0f} euros",
+            "Economie 3CL (potentiel technique)": f"{eco_3:.0f} euros",
+            "Ecart": f"{eco_3 - eco_e:.0f} euros",
         })
 
     if cmp_rows:

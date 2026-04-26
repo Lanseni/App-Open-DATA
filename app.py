@@ -384,7 +384,23 @@ with tab1:
                                f'text-align:center;line-height:22px;width:22px">{rank}</div>',
                           icon_size=(22,22), icon_anchor=(11,11))).add_to(m)
 
-    st_folium(m, height=460, use_container_width=True)
+    map_data = st_folium(m, height=460, use_container_width=True, key="main_map")
+
+    # Détecter le marqueur cliqué via le tooltip (contient "#rank")
+    if map_data and map_data.get("last_object_clicked_tooltip"):
+        tip = map_data["last_object_clicked_tooltip"]
+        import re as _re
+        m_rank = _re.match(r"#(\d+)", str(tip))
+        if m_rank:
+            clicked = int(m_rank.group(1))
+            if st.session_state.get("selected_logement") != clicked:
+                st.session_state["selected_logement"] = clicked
+                st.rerun()
+
+    if st.session_state.get("selected_logement"):
+        sel = st.session_state["selected_logement"]
+        st.info(f"Logement **#{sel}** sélectionné — sa fiche détaillée est ouverte ci-dessous.")
+
     st.markdown(SEP, unsafe_allow_html=True)
 
     # ── CONSOMMATIONS ──
@@ -520,7 +536,19 @@ with tab1:
 
     # ── FICHES INDIVIDUELLES ──
     st.markdown("### Fiches détaillées — Cliquez sur un logement pour tout savoir")
-    st.caption("Chaque fiche contient : caracteristiques du bâtiment, detail des consommations par usage, qualite d'isolation et score DPE.")
+    st.caption("Cliquez sur un marqueur de la carte pour ouvrir directement la fiche du logement correspondant.")
+
+    # Injection JS pour scroller vers la fiche sélectionnée
+    selected_rank = st.session_state.get("selected_logement")
+    if selected_rank:
+        st.markdown(
+            f'<script>window.setTimeout(function(){{'
+            f'var el=document.getElementById("fiche-{selected_rank}");'
+            f'if(el){{el.scrollIntoView({{behavior:"smooth",block:"start"}})}}'
+            f'}},400);</script>',
+            unsafe_allow_html=True,
+        )
+
     for rank, (_, row) in enumerate(nearest.iterrows(), 1):
         dpe  = str(row.get("etiquette_dpe","?"))
         surf = row.get("surface_habitable_logement",0)
@@ -529,8 +557,14 @@ with tab1:
         dist = row.get("distance_m",0)
         ecrt = (rkwh-dkwh)/dkwh*100 if dkwh else 0
         cout = rkwh*prix_kwh
-        with st.expander(f"#{rank} — {row.get('adresse_ban','N/A')}  |  "
-                         f"DPE {dpe}  |  {surf:.0f} m2  |  {dist:,} m  |  {rkwh:.0f} kWh/an"):
+        is_selected = (selected_rank == rank)
+        # Ancre HTML pour le scroll
+        st.markdown(f'<div id="fiche-{rank}"></div>', unsafe_allow_html=True)
+        with st.expander(
+            f"{'→ ' if is_selected else ''}#{rank} — {row.get('adresse_ban','N/A')}  |  "
+            f"DPE {dpe}  |  {surf:.0f} m²  |  {dist:,} m  |  {rkwh:.0f} kWh/an",
+            expanded=is_selected,
+        ):
             fa, fb, fc = st.columns(3)
             with fa:
                 st.markdown("**Caracteristiques**")

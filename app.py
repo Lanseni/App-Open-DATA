@@ -805,8 +805,9 @@ with tab4:
         ud = df[df["etiquette_dpe"]==dpe_cur]["conso_relle_kwh"].dropna()
     est_kwh = int(ud.median()) if not ud.empty else 4000
 
-    col_p, col_r = st.columns([1,3])
-    with col_p:
+    # ── Parametres (ligne du haut) ──
+    pa1, pa2, pa3 = st.columns([1, 1, 2])
+    with pa1:
         st.markdown("#### Parametres")
         kwh = st.number_input("Conso annuelle actuelle (kWh)",
                               min_value=500, max_value=50000,
@@ -817,26 +818,23 @@ with tab4:
             f"Conso : **{kwh:,} kWh/an**<br>"
             f"**Cout actuel : {kwh*prix_kwh:.0f} euros/an**",
             unsafe_allow_html=True)
-        st.markdown("---")
+    with pa2:
+        st.markdown("#### Potentiel technique (3CL)")
         cm  = DPE_KWH_M2.get(dpe_cur,100.0)
         r_b = DPE_KWH_M2["B"]/cm
         r_a = DPE_KWH_M2["A"]/cm
-        st.markdown("**Potentiel technique (3CL)**")
         if dpe_cur not in ("A","B"):
-            st.metric("Apres → B", f"{kwh*r_b:.0f} kWh/an",
-                      delta=f"-{(1-r_b)*100:.0f}%", delta_color="inverse")
+            st.metric("Apres renovation → B", f"{kwh*r_b:.0f} kWh/an",
+                      delta=f"-{(1-r_b)*100:.0f}% de conso", delta_color="inverse")
         if dpe_cur != "A":
-            st.metric("Apres → A", f"{kwh*r_a:.0f} kWh/an",
-                      delta=f"-{(1-r_a)*100:.0f}%", delta_color="inverse")
-
-    with col_r:
-        ex1, ex2 = st.columns(2)
-        with ex1:
-            st.info("**Modele Enedis** — Consommations reelles Linky. "
-                    "Integre l'effet precarite. Reflète ce qui se passe vraiment.")
-        with ex2:
-            st.success("**Modele 3CL** — Standard DPE officiel (kWh/m2/an). "
-                       "Potentiel physique maximal de la renovation.")
+            st.metric("Apres renovation → A", f"{kwh*r_a:.0f} kWh/an",
+                      delta=f"-{(1-r_a)*100:.0f}% de conso", delta_color="inverse")
+    with pa3:
+        st.markdown("#### Methodologie")
+        st.info("**Modele Enedis** — Consommations reelles mesurées par les compteurs Linky. "
+                "Integre l'effet precarite energetique. Reflète ce qui se passe vraiment.")
+        st.success("**Modele 3CL** — Standard DPE officiel (kWh/m2/an). "
+                   "Mesure le potentiel physique maximal de la renovation thermique.")
 
     st.markdown("---")
 

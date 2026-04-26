@@ -43,7 +43,7 @@ DEPERD_COLS = {"deperditions_enveloppe":"Enveloppe totale",
 DPE_KWH_M2 = {"A":25.3,"B":41.4,"C":69.1,"D":96.6,"E":132.0,"F":172.0,"G":242.0}
 
 st.set_page_config(page_title="DPE & Conso", page_icon="⚡",
-                   layout="wide", initial_sidebar_state="expanded")
+                   layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""
 <style>
   .block-container{padding-top:1.2rem}
@@ -214,69 +214,87 @@ def annual_table(yrs, scenarios, key_prefix):
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
 # ─────────────────────────────────────────────────────────────
-# SIDEBAR
+# HEADER + INPUTS EN HAUT
 # ─────────────────────────────────────────────────────────────
-with st.sidebar:
-    try:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Logo_Enedis.svg/320px-Logo_Enedis.svg.png", width=130)
-    except Exception:
-        pass
+st.markdown("""
+<div style="display:flex;align-items:center;gap:16px;margin-bottom:4px">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Logo_Enedis.svg/320px-Logo_Enedis.svg.png" height="36">
+  <div>
+    <h1 style="margin:0;font-size:1.6rem">DPE & Consommation Electrique — Analyse & Prediction</h1>
+    <p style="margin:0;color:#666;font-size:0.9rem">Comparez votre consommation avec vos voisins et estimez les economies d'une renovation. Donnees ADEME x Enedis.</p>
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-    st.markdown("## 📍 Votre adresse")
-    st.caption("Entrez votre adresse pour localiser les logements similaires les plus proches.")
-    addr_input = st.text_input("Adresse complete",
-                               placeholder="Ex: 12 rue Jean Jaures, Orleans",
-                               help="Geocodage via l'API BAN (adresse.data.gouv.fr).")
-    geo_btn = st.button("Geolocaliser & Analyser", type="primary", use_container_width=True)
+# ── Barre d'inputs ──────────────────────────────────────────
+with st.expander("⚙️  Personnaliser mon analyse — Cliquez pour saisir votre adresse et les caracteristiques de votre logement", expanded=True):
+    row1_a, row1_b, row1_c = st.columns([3, 1, 1])
+    with row1_a:
+        st.markdown("**📍 Votre adresse**")
+        addr_col, btn_col = st.columns([3, 1])
+        with addr_col:
+            addr_input = st.text_input("Adresse", placeholder="Ex: 12 rue Jean Jaures, Orleans",
+                                       label_visibility="collapsed",
+                                       help="Geocodage via l'API BAN (adresse.data.gouv.fr).")
+        with btn_col:
+            geo_btn = st.button("🔍 Localiser", type="primary", use_container_width=True)
 
-    if geo_btn and addr_input.strip():
-        with st.spinner("Geocodage..."):
-            lat, lon, lbl, score, city = geocode(addr_input.strip())
-        if lat:
-            st.session_state.update({"geo_lat":lat,"geo_lon":lon,
-                                     "geo_label":lbl,"geo_city":city,"geo_score":score})
-        else:
-            st.error("Adresse introuvable.")
-            for k in ["geo_lat","geo_lon","geo_label","geo_city","geo_score"]:
-                st.session_state.pop(k, None)
+        if geo_btn and addr_input.strip():
+            with st.spinner("Geocodage..."):
+                lat, lon, lbl, score, city = geocode(addr_input.strip())
+            if lat:
+                st.session_state.update({"geo_lat":lat,"geo_lon":lon,
+                                         "geo_label":lbl,"geo_city":city,"geo_score":score})
+            else:
+                st.error("Adresse introuvable. Verifiez l'orthographe.")
+                for k in ["geo_lat","geo_lon","geo_label","geo_city","geo_score"]:
+                    st.session_state.pop(k, None)
 
-    if "geo_label" in st.session_state:
-        st.success(st.session_state["geo_label"])
-        st.caption(f"Confiance : {int(st.session_state.get('geo_score',0)*100)}%")
+        if "geo_label" in st.session_state:
+            st.success(f"📍 {st.session_state['geo_label']}  —  confiance : {int(st.session_state.get('geo_score',0)*100)}%")
 
-    st.markdown("---")
-    st.markdown("## 🏠 Votre logement")
-    st.caption("Ces informations personnalisent l'analyse et la prediction.")
+    with row1_b:
+        st.markdown("**🏗️ Type & Surface**")
+        type_bat = st.selectbox("Type", ["appartement","maison","immeuble"],
+                                label_visibility="collapsed")
+        surface  = st.slider("Surface (m2)", 15, 300, 65, step=5)
 
-    geo_city  = st.session_state.get("geo_city","")
-    matched   = next((c for c in communes_list if geo_city.lower() in c.lower()), None) if geo_city else None
-    def_idx   = communes_list.index(matched) if matched else (
-                communes_list.index("Orleans") if "Orleans" in communes_list else 0)
-    commune   = st.selectbox("Commune (onglets 2-3)", communes_list, index=def_idx,
-                             help="Grandes metropoles absentes du dataset Enedis (min 10 logements/adresse).")
-    if geo_city and not matched:
-        st.warning(f"**{geo_city}** absent du dataset. Grandes villes (Nice, Paris, Lyon...) non disponibles.")
+    with row1_c:
+        st.markdown("**🏷️ Classe DPE & Periode**")
+        dpe_cur = st.select_slider("Classe DPE", options=DPE_ORDER, value="D")
+        st.markdown(f"Classe selectionnee : {badge(dpe_cur)}", unsafe_allow_html=True)
+        periode = st.selectbox("Periode",
+                               ["Inconnue","Avant 1948","1948-1974","1975-1989",
+                                "1990-2000","2001-2005","2006-2012","2013-2021","Apres 2021"],
+                               label_visibility="collapsed")
 
-    type_bat  = st.selectbox("Type de batiment", ["appartement","maison","immeuble"])
-    surface   = st.slider("Surface habitable (m2)", 15, 300, 65, step=5)
-    dpe_cur   = st.select_slider("Classe DPE actuelle", options=DPE_ORDER, value="D")
-    periode   = st.selectbox("Periode de construction",
-                             ["Inconnue","Avant 1948","1948-1974","1975-1989",
-                              "1990-2000","2001-2005","2006-2012","2013-2021","Apres 2021"])
-    st.markdown(f"Classe : {badge(dpe_cur)}", unsafe_allow_html=True)
+    st.markdown('<hr style="margin:8px 0">', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown("### 💶 Hypotheses tarifaires")
-    st.caption("Ces valeurs servent a convertir les kWh en euros dans les previsions.")
-    prix_kwh    = st.number_input("Prix (euros/kWh)", 0.10, 1.0, ELECTRICITY_PRICE, 0.01)
-    taux_hausse = st.slider("Hausse annuelle (%)", 0, 10, DEFAULT_INCREASE) / 100
-    st.caption(f"Base : {len(df):,} logements · {len(communes_list)} communes")
+    row2_a, row2_b, row2_c, row2_d = st.columns([3, 1, 1, 1])
+    with row2_a:
+        geo_city = st.session_state.get("geo_city","")
+        matched  = next((c for c in communes_list if geo_city.lower() in c.lower()), None) if geo_city else None
+        def_idx  = communes_list.index(matched) if matched else (
+                   communes_list.index("Orleans") if "Orleans" in communes_list else 0)
+        st.markdown("**🏘️ Commune de reference** *(onglets 2 et 3)*")
+        commune  = st.selectbox("Commune", communes_list, index=def_idx,
+                                label_visibility="collapsed",
+                                help="Les grandes metropoles (Paris, Nice, Lyon...) sont absentes du dataset Enedis.")
+        if geo_city and not matched:
+            st.warning(f"**{geo_city}** absent du dataset — grandes villes non disponibles.")
+    with row2_b:
+        st.markdown("**💶 Prix electricite**")
+        prix_kwh = st.number_input("Prix (euros/kWh)", 0.10, 1.0, ELECTRICITY_PRICE, 0.01,
+                                   label_visibility="collapsed")
+    with row2_c:
+        st.markdown("**📈 Hausse annuelle**")
+        taux_hausse = st.slider("Hausse (%)", 0, 10, DEFAULT_INCREASE,
+                                label_visibility="collapsed") / 100
+    with row2_d:
+        st.markdown("**📊 Dataset**")
+        st.metric("Logements", f"{len(df):,}")
+        st.caption(f"{len(communes_list)} communes")
 
-# ─────────────────────────────────────────────────────────────
-# HEADER
-# ─────────────────────────────────────────────────────────────
-st.title("DPE & Consommation Electrique — Analyse & Prediction")
-st.caption("Comparez votre consommation electrique avec vos voisins et estimez les economies d'une renovation energetique. Donnees ADEME (DPE) x Enedis.")
 st.markdown("---")
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([

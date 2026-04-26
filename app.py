@@ -180,6 +180,7 @@ def median_conso_by_dpe(data):
 
 
 def predict_costs(kwh_year, prix, taux, dpe_cur):
+    """Prediction basee sur les medianes de consommation reelle Enedis par classe DPE."""
     conso_med = median_conso_by_dpe(df)["conso_relle_kwh"]
     base_g    = conso_med.get("G", kwh_year) or kwh_year
     def factor(cls):
@@ -189,13 +190,36 @@ def predict_costs(kwh_year, prix, taux, dpe_cur):
     s = {}
     s["Sans renovation"] = [kwh_year*prix*(1+taux)**i for i in range(len(years))]
     if dpe_cur not in ("A","B"):
-        r = factor("B")/max(factor(dpe_cur),0.01)
+        r  = factor("B")/max(factor(dpe_cur),0.01)
         nk = kwh_year*r
         s["Renovation -> Classe B"] = [(kwh_year if i<2 else nk)*prix*(1+taux)**i for i in range(len(years))]
     if dpe_cur != "A":
-        r = factor("A")/max(factor(dpe_cur),0.01)
+        r  = factor("A")/max(factor(dpe_cur),0.01)
         nk = kwh_year*r
         s["Renovation -> Classe A"] = [(kwh_year if i<3 else nk)*prix*(1+taux)**i for i in range(len(years))]
+    return years, s
+
+
+def predict_costs_3cl(kwh_year, prix, taux, dpe_cur):
+    """
+    Prediction basee sur le standard DPE 3CL (methode officielle de calcul thermique).
+    Les ratios de reduction correspondent au potentiel technique reel de la renovation.
+    Source : medianes kWh/m2/an calcules sur le dataset ADEME (methode 3CL).
+    """
+    DPE_KWH_M2 = {
+        "A": 25.3, "B": 41.4, "C": 69.1,
+        "D": 96.6, "E": 132.0, "F": 172.0, "G": 242.0,
+    }
+    cur_m2 = DPE_KWH_M2.get(dpe_cur, 100.0)
+    years  = list(range(2025, 2036))
+    s = {}
+    s["Sans renovation"] = [kwh_year*prix*(1+taux)**i for i in range(len(years))]
+    if dpe_cur not in ("A", "B"):
+        nk_b = kwh_year * (DPE_KWH_M2["B"] / cur_m2)
+        s["Renovation -> Classe B"] = [(kwh_year if i<2 else nk_b)*prix*(1+taux)**i for i in range(len(years))]
+    if dpe_cur != "A":
+        nk_a = kwh_year * (DPE_KWH_M2["A"] / cur_m2)
+        s["Renovation -> Classe A"] = [(kwh_year if i<3 else nk_a)*prix*(1+taux)**i for i in range(len(years))]
     return years, s
 
 
@@ -269,11 +293,12 @@ st.title("DPE & Consommation Electrique — Analyse & Prediction")
 st.caption("Donnees ADEME (DPE) x Enedis (consommations reelles Linky). Saisissez votre adresse pour une analyse geolocalise.")
 st.markdown("---")
 
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "Logements proches",
     "Analyse commune",
     "Analyse France",
-    "Prediction 10 ans",
+    "Prediction 10 ans (Enedis)",
+    "Prediction 10 ans (3CL)",
 ])
 
 
@@ -1125,6 +1150,235 @@ with tab4:
                            title="Economies cumulees vs sans renovation",markers=True)
         fig_cum2.update_layout(height=300,hovermode="x unified")
         st.plotly_chart(fig_cum2, use_container_width=True, key="chart_fig_cum2_23")
+
+
+
+# ══════════════════════════════════════════════════════════════
+# TAB 5 — PREDICTION 10 ANS — METHODE 3CL (STANDARD DPE)
+# ══════════════════════════════════════════════════════════════
+with tab5:
+    st.subheader("Prediction 10 ans — Methode standard DPE 3CL")
+
+    st.info(
+        "Ce modele utilise les **kWh/m2/an du standard DPE 3CL** (methode officielle de calcul thermique) "
+        "pour estimer le **potentiel technique de reduction** apres renovation, "
+        "independamment des comportements de chauffage reels."
+    )
+
+    # Tableau comparatif des deux methodes
+    st.markdown("### Pourquoi deux modeles ?")
+    c_why1, c_why2 = st.columns(2)
+    with c_why1:
+        st.markdown("""
+**Onglet precedent — Modele Enedis (consommations reelles)**
+- Base : medianes de consommation mesurees par les compteurs Linky
+- Avantage : reflète ce qui se passe vraiment
+- Limite : integre l **effet precarite** (menages F/G sous-chauffes par contrainte budgetaire)
+  → les classes F/G consomment parfois **moins** que les classes C/D en reel
+- Consequence : l ecart B→A peut sembler negligeable en reel
+        """)
+    with c_why2:
+        st.markdown("""
+**Cet onglet — Modele 3CL (potentiel technique)**
+- Base : kWh/m2/an de la methode de calcul thermique officielle (methode 3CL)
+- Avantage : mesure le potentiel **physique** de la renovation (isolation, systemes)
+- Limite : ne tient pas compte des comportements (setpoint de temperature, taux d occupation)
+- Consequence : donne les economies **maximales atteignables** par la renovation
+
+| Classe | kWh/m2/an 3CL | Reduction vs G |
+|---|---|---|
+| A | 25 kWh/m2 | -90% |
+| B | 41 kWh/m2 | -83% |
+| C | 69 kWh/m2 | -71% |
+| D | 97 kWh/m2 | -60% |
+| E | 132 kWh/m2 | -45% |
+| F | 172 kWh/m2 | -29% |
+| G | 242 kWh/m2 | reference |
+        """)
+
+    st.markdown("---")
+
+    # Estimation conso actuelle
+    user_data3 = df[
+        (df["etiquette_dpe"] == dpe_actuel) &
+        df["surface_habitable_logement"].between(surface * 0.7, surface * 1.4)
+    ]["conso_relle_kwh"].dropna()
+    if user_data3.empty:
+        user_data3 = df[df["etiquette_dpe"] == dpe_actuel]["conso_relle_kwh"].dropna()
+    estimated_kwh3 = int(user_data3.median()) if not user_data3.empty else 4000
+
+    col_p3, col_c3 = st.columns([1, 3])
+
+    with col_p3:
+        st.markdown("#### Parametres")
+        custom_kwh3 = st.number_input(
+            "Conso annuelle actuelle (kWh)",
+            min_value=500, max_value=50000,
+            value=estimated_kwh3, step=100,
+            key="kwh_3cl",
+            help="Votre consommation reelle mesuree (ou estimee depuis le dataset Enedis).",
+        )
+
+        DPE_KWH_M2 = {"A":25.3,"B":41.4,"C":69.1,"D":96.6,"E":132.0,"F":172.0,"G":242.0}
+        cur_m2   = DPE_KWH_M2.get(dpe_actuel, 100.0)
+        ratio_b  = DPE_KWH_M2.get("B", cur_m2) / cur_m2
+        ratio_a  = DPE_KWH_M2["A"] / cur_m2
+        nk_b     = custom_kwh3 * ratio_b
+        nk_a     = custom_kwh3 * ratio_a
+        eco_b_yr = (custom_kwh3 - nk_b) * prix_kwh
+        eco_a_yr = (custom_kwh3 - nk_a) * prix_kwh
+
+        st.markdown(
+            f"**Profil**<br>"
+            f"Classe DPE : {dpe_badge(dpe_actuel)}<br>"
+            f"Surface : **{surface} m2**<br>"
+            f"Conso actuelle : **{custom_kwh3:,} kWh/an**<br>"
+            f"Cout actuel : **{custom_kwh3*prix_kwh:,.0f} euros/an**",
+            unsafe_allow_html=True,
+        )
+        st.markdown("---")
+        st.markdown("**Potentiel technique (3CL)**")
+        if dpe_actuel not in ("A", "B"):
+            st.metric(f"Apres renovation classe B", f"{nk_b:,.0f} kWh/an",
+                      delta=f"-{custom_kwh3-nk_b:,.0f} kWh/an ({(1-ratio_b)*100:.0f}%)",
+                      delta_color="inverse")
+            st.metric(f"Economie annuelle → B", f"{eco_b_yr:,.0f} euros/an", delta_color="off")
+        if dpe_actuel != "A":
+            st.metric(f"Apres renovation classe A", f"{nk_a:,.0f} kWh/an",
+                      delta=f"-{custom_kwh3-nk_a:,.0f} kWh/an ({(1-ratio_a)*100:.0f}%)",
+                      delta_color="inverse")
+            st.metric(f"Economie annuelle → A", f"{eco_a_yr:,.0f} euros/an", delta_color="off")
+
+    with col_c3:
+        years3, scenarios3 = predict_costs_3cl(custom_kwh3, prix_kwh, taux_hausse, dpe_actuel)
+
+        fig_pred3 = go.Figure()
+        for (name, costs), col_s in zip(scenarios3.items(), ["#d62728", "#FFB432", "#2ca02c"]):
+            fig_pred3.add_trace(go.Scatter(
+                x=years3, y=[round(c) for c in costs],
+                mode="lines+markers", name=name,
+                line=dict(color=col_s, width=3), marker=dict(size=7),
+                hovertemplate=f"<b>{name}</b><br>%{{x}} : %{{y:,.0f}} euros<extra></extra>",
+            ))
+        if len(scenarios3) > 1:
+            fig_pred3.add_vrect(
+                x0=2026.5, x1=2028.5, fillcolor="lightgreen", opacity=0.1,
+                annotation_text="Fenetre renovation", annotation_position="top left",
+            )
+        fig_pred3.update_layout(
+            title=f"Couts electriques (methode 3CL) — DPE {dpe_actuel}, {surface} m2",
+            xaxis_title="Annee", yaxis_title="euros/an",
+            hovermode="x unified",
+            legend=dict(orientation="h", y=1.08, x=0),
+            height=400,
+        )
+        st.plotly_chart(fig_pred3, use_container_width=True, key="chart_pred3cl_main")
+
+    # Tableau annuel
+    st.markdown("### Couts annuels detailles — Methode 3CL")
+    base3 = list(scenarios3.values())[0]
+    rows3 = []
+    for yr, base in zip(years3, base3):
+        row3 = {"Annee": yr, list(scenarios3.keys())[0]: f"{base:,.0f} euros"}
+        for name, costs in list(scenarios3.items())[1:]:
+            c3_ = costs[years3.index(yr)]
+            row3[name] = f"{c3_:,.0f} euros"
+            row3["Economie vs sans renov."] = f"{base - c3_:,.0f} euros"
+        rows3.append(row3)
+    st.dataframe(pd.DataFrame(rows3), use_container_width=True, hide_index=True)
+
+    # Economies cumulees
+    st.markdown("### Economies cumulees — Methode 3CL")
+    total_base3 = sum(base3)
+    ecols3 = st.columns(len(scenarios3))
+    for i3, (name, costs) in enumerate(scenarios3.items()):
+        saving3 = total_base3 - sum(costs)
+        with ecols3[i3]:
+            st.metric(
+                name,
+                f"{sum(costs):,.0f} euros cumules",
+                delta=f"-{saving3:,.0f} euros" if saving3 > 0 else "Reference",
+                delta_color="inverse" if saving3 > 0 else "off",
+            )
+
+    if len(scenarios3) > 1:
+        cum_rows3 = []
+        for name, costs in list(scenarios3.items())[1:]:
+            cum3 = 0
+            for yr, (base, alt) in zip(years3, zip(base3, costs)):
+                cum3 += base - alt
+                cum_rows3.append({"Annee": yr, "Scenario": name, "Economie cumulee (euros)": round(cum3)})
+        fig_cum3 = px.area(
+            pd.DataFrame(cum_rows3),
+            x="Annee", y="Economie cumulee (euros)", color="Scenario",
+            color_discrete_sequence=["#FFB432", "#2ca02c"],
+            title="Economies cumulees (methode 3CL) vs sans renovation",
+            markers=True,
+        )
+        fig_cum3.update_layout(height=300, hovermode="x unified")
+        st.plotly_chart(fig_cum3, use_container_width=True, key="chart_cum3cl")
+
+    # Comparaison cote-a-cote des deux methodes
+    st.markdown("---")
+    st.markdown("### Comparaison des deux methodes")
+    st.caption("Cote a cote : economies totales sur 11 ans selon le modele Enedis (reel) vs modele 3CL (potentiel technique)")
+
+    years_e, scenarios_e = predict_costs(custom_kwh3, prix_kwh, taux_hausse, dpe_actuel)
+    total_e = sum(list(scenarios_e.values())[0])
+    total_3 = sum(list(scenarios3.values())[0])
+
+    cmp_rows = []
+    for (name_e, costs_e), (name_3, costs_3) in zip(
+        list(scenarios_e.items())[1:], list(scenarios3.items())[1:]
+    ):
+        eco_e = total_e - sum(costs_e)
+        eco_3 = total_3 - sum(costs_3)
+        scenario_label = name_e.replace("Renovation -> ", "")
+        cmp_rows.append({
+            "Scenario": scenario_label,
+            "Economie Enedis (reel)": f"{eco_e:,.0f} euros",
+            "Economie 3CL (potentiel technique)": f"{eco_3:,.0f} euros",
+            "Ecart": f"{eco_3 - eco_e:,.0f} euros",
+        })
+
+    if cmp_rows:
+        cmp_df3 = pd.DataFrame(cmp_rows)
+        st.dataframe(cmp_df3, use_container_width=True, hide_index=True)
+
+        # Graphique comparatif
+        fig_cmp_both = go.Figure()
+        for row in cmp_rows:
+            sc = row["Scenario"]
+            fig_cmp_both.add_trace(go.Bar(
+                name=f"{sc} — Enedis",
+                x=[sc],
+                y=[float(row["Economie Enedis (reel)"].replace(",","").replace(" euros",""))],
+                marker_color="#F28E2B",
+                text=row["Economie Enedis (reel)"],
+                textposition="outside",
+            ))
+            fig_cmp_both.add_trace(go.Bar(
+                name=f"{sc} — 3CL",
+                x=[sc],
+                y=[float(row["Economie 3CL (potentiel technique)"].replace(",","").replace(" euros",""))],
+                marker_color="#2ca02c",
+                text=row["Economie 3CL (potentiel technique)"],
+                textposition="outside",
+            ))
+        fig_cmp_both.update_layout(
+            barmode="group",
+            title="Economies totales sur 11 ans : Modele Enedis vs Modele 3CL",
+            yaxis_title="Economies cumulees (euros)",
+            legend=dict(orientation="h", y=-0.3),
+            height=380,
+        )
+        st.plotly_chart(fig_cmp_both, use_container_width=True, key="chart_cmp_both_methods")
+        st.caption(
+            "Le modele Enedis reflète les comportements reels (avec effet precarite). "
+            "Le modele 3CL indique le potentiel maximal atteignable par la renovation thermique. "
+            "La verite se situe entre les deux."
+        )
+
 
 st.markdown("---")
 st.caption(

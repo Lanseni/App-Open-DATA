@@ -498,7 +498,7 @@ with tab1:
     st.markdown("### Tableau comparatif complet des 10 logements")
     rcols = {"distance_m":"Dist.(m)","etiquette_dpe":"DPE","score_dpe":"Score",
              "type_bâtiment":"Type","surface_habitable_logement":"Surface(m2)",
-             "période_construction":"Période","qualite_isolation_enveloppe":"Iso.env",
+             "periode_construction":"Période","qualite_isolation_enveloppe":"Iso.env",
              "qualite_isolation_murs":"Iso.murs","zone_climatique":"Zone",
              "conso_5_usages_par_m2_ef":"kWh/m2","conso_dpe_kwh":"kWh DPE",
              "conso_relle_kwh":"kWh Reel","conso_chauffage_ef":"Chauf.",
@@ -785,17 +785,17 @@ with tab3:
     if gnat:
         st.dataframe(pd.DataFrame(gnat), use_container_width=True, hide_index=True)
 
-    prd = (df.dropna(subset=["conso_relle_kwh","période_construction"])
-             .groupby(["période_construction","etiquette_dpe"],observed=True)
+    prd = (df.dropna(subset=["conso_relle_kwh","periode_construction"])
+             .groupby(["periode_construction","etiquette_dpe"],observed=True)
              ["conso_relle_kwh"].median().reset_index())
     p_order = ["Avant 1948","1948-1974","1975-1989","1990-2000",
                "2001-2005","2006-2012","2013-2021","Apres 2021","Inconnue"]
-    fig = px.bar(prd[prd["période_construction"].isin(p_order)],
-                 x="période_construction", y="conso_relle_kwh",
+    fig = px.bar(prd[prd["periode_construction"].isin(p_order)],
+                 x="periode_construction", y="conso_relle_kwh",
                  color="etiquette_dpe", color_discrete_map=DPE_COLORS,
-                 category_orders={"période_construction":p_order},
+                 category_orders={"periode_construction":p_order},
                  barmode="group", title="Consommation réelle médiane par période x classe DPE",
-                 labels={"conso_relle_kwh":"kWh/an","période_construction":"Période"})
+                 labels={"conso_relle_kwh":"kWh/an","periode_construction":"Période"})
     fig.update_layout(height=370)
     st.plotly_chart(fig, use_container_width=True, key="t3_prd")
 
@@ -1138,20 +1138,20 @@ with tab5:
 
     with c1_5:
         # Conso reelle x période x DPE
-        prd5 = (df.dropna(subset=["conso_relle_kwh","période_construction","etiquette_dpe"])
-                  .groupby(["période_construction","etiquette_dpe"], observed=True)
+        prd5 = (df.dropna(subset=["conso_relle_kwh","periode_construction","etiquette_dpe"])
+                  .groupby(["periode_construction","etiquette_dpe"], observed=True)
                   ["conso_relle_kwh"].median().reset_index())
         p_order5 = ["Avant 1948","1948-1974","1975-1989","1990-2000",
                     "2001-2005","2006-2012","2013-2021"]
-        prd5 = prd5[prd5["période_construction"].isin(p_order5)]
+        prd5 = prd5[prd5["periode_construction"].isin(p_order5)]
         fig_prd5 = px.bar(
-            prd5, x="période_construction", y="conso_relle_kwh",
+            prd5, x="periode_construction", y="conso_relle_kwh",
             color="etiquette_dpe", color_discrete_map=DPE_COLORS,
-            category_orders={"période_construction": p_order5,
+            category_orders={"periode_construction": p_order5,
                              "etiquette_dpe": DPE_ORDER_5},
             barmode="group",
             title="Conso reelle selon la période de construction et la classe DPE",
-            labels={"conso_relle_kwh":"kWh/an","période_construction":"Période"},
+            labels={"conso_relle_kwh":"kWh/an","periode_construction":"Période"},
         )
         fig_prd5.update_layout(height=400, legend=dict(orientation="h", y=-0.35))
         st.plotly_chart(fig_prd5, use_container_width=True, key="t5_prd")
